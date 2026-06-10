@@ -1,6 +1,6 @@
 // contents/douyin.ts — 抖音：视频采集（v2.0 保持 v1.0 逻辑）
 import type { PlasmoCSConfig } from "plasmo"
-import { injectStyles, HoverUIManager, showToast, extractTitle } from "./base"
+import { injectStyles, HoverUIManager, showToast, extractTitle } from "../lib/base"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://www.douyin.com/*"],

@@ -1,6 +1,6 @@
 // contents/xiaohongshu.ts — 小红书：单图采集 + 多图笔记提取
 import type { PlasmoCSConfig } from "plasmo"
-import { injectStyles, HoverUIManager, showToast, extractTitle } from "./base"
+import { injectStyles, HoverUIManager, showToast, extractTitle } from "../lib/base"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://www.xiaohongshu.com/*"],

@@ -1,0 +1,45 @@
+{
+  "name": "media-collector-plasmo",
+  "displayName": "素材采集助手",
+  "version": "1.0.0",
+  "description": "一键采集小红书、抖音的图片和视频素材",
+  "scripts": {
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package"
+  },
+  "dependencies": {
+    "plasmo": "0.90.5",
+    "react": "^18",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  },
+  "manifest": {
+    "host_permissions": [
+      "https://www.xiaohongshu.com/*",
+      "https://www.douyin.com/*"
+    ],
+    "permissions": [
+      "storage",
+      "downloads",
+      "activeTab",
+      "scripting",
+      "contextMenus",
+      "notifications"
+    ],
+    "commands": {
+      "collect_media": {
+        "suggested_key": {
+          "default": "Ctrl+Shift+S",
+          "mac": "Command+Shift+S"
+        },
+        "description": "采集鼠标悬停的素材"
+      }
+    }
+  }
+}
