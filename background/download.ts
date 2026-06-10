@@ -19,7 +19,7 @@ export function downloadSingle(
     chrome.downloads.download(
       {
         url,
-        filename: "media-collector/" + (filename || "素材"),
+        filename: "media-collector/" + (filename || "素材.jpg"),
         saveAs: true,
       },
       (downloadId) => {
