@@ -1,16 +1,7 @@
 // background/download.ts — 下载操作
 
-// NOTE: showNote will be importable from ./index after Task 4 refactors background/index.ts
-// For now, define a local stub that gets replaced later
-function showNote(title: string, msg: string) {
-  chrome.notifications.create({
-    type: "basic",
-    iconUrl: "icon.png",
-    title,
-    message: msg,
-  })
-}
 
+import { showNote } from "./index"
 export function downloadSingle(
   url: string,
   filename: string
@@ -71,3 +62,4 @@ export function batchDownload(
     })
   })
 }
+
