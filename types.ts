@@ -1,10 +1,13 @@
 // types.ts — 素材采集助手共享类型定义
 
+export type MediaType = "image" | "video"
+export type Platform = "xiaohongshu" | "douyin" | "unknown"
+
 export interface MediaItem {
   id: string
   url: string
-  type: "image" | "video"
-  platform: "xiaohongshu" | "douyin" | "unknown"
+  type: MediaType
+  platform: Platform
   title: string
   sourceUrl: string
   collectedAt: string
@@ -35,8 +38,8 @@ export type MessageType =
 export interface MessagePayloads {
   COLLECT_MEDIA: {
     url: string
-    type: string
-    platform: string
+    type: MediaType
+    platform: Platform
     title: string
     sourceUrl: string
     noteId?: string
@@ -72,8 +75,8 @@ export interface MessageResponse {
   errors?: string[]
   media?: {
     url: string
-    type: string
-    platform: string
+    type: MediaType
+    platform: Platform
     title: string
     sourceUrl: string
   } | null
@@ -81,7 +84,7 @@ export interface MessageResponse {
 
 export const STORAGE_KEY = "collected_media"
 
-export const PLATFORM_LABELS: Record<string, string> = {
+export const PLATFORM_LABELS: Record<Platform, string> = {
   xiaohongshu: "小红书",
   douyin: "抖音",
   unknown: "未知",
