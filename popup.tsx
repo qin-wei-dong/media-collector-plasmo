@@ -286,10 +286,13 @@ function Popup() {
     )
   }
 
-  // M1 占位:全屏素材库在 M2 上线。先用底部 Toast 友好提示,避免死按钮。
-  // M2 改为 chrome.tabs.create({ url: chrome.runtime.getURL("tabs/library.html") })
+  // M2: 打开全屏素材库页
   const openLibrary = () => {
-    setDownloadError("素材库即将上线,敬请期待 ✨")
+    try {
+      chrome.tabs.create({ url: chrome.runtime.getURL("tabs/library.html") })
+    } catch {
+      setDownloadError("无法打开素材库,请稍后重试")
+    }
   }
 
   // 全选/取消全选当前筛选结果
