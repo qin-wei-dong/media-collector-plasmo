@@ -4,13 +4,12 @@ import type { MediaItem } from "./types"
 import { getTimeBucket, TIME_ORDER } from "./lib/design-tokens"
 import { ThemeProvider, useTheme, useThemeControl } from "./lib/use-theme"
 import type { ThemeTokens } from "./lib/design-tokens"
-import { Hero } from "./components/Hero"
-import { AuthorCarousel } from "./components/AuthorCarousel"
 import { FloatBar } from "./components/FloatBar"
 import { EmptyState } from "./components/EmptyState"
 import { MediaCard } from "./components/MediaCard"
 import { PreviewModal } from "./components/PreviewModal"
 import { Toast } from "./components/Toast"
+import { StatCard } from "./components/StatCard"
 
 // 注入全局样式:覆盖 Plasmo 默认 body 白底/margin,让 popup 整体深色透明
 // 接受 theme 参数:P3-21 加 light 主题时,theme 变了会重新注入 focus ring / 颜色
@@ -35,7 +34,7 @@ function injectPopupStyles(theme: import("./lib/design-tokens").ThemeTokens) {
       border-radius: ${theme.r.sm}px;
     }
     button:focus-visible, [role="button"]:focus-visible {
-      box-shadow: 0 0 0 2px ${theme.accent}, 0 0 0 4px rgba(0,102,204,0.3);
+      box-shadow: 0 0 0 2px ${theme.accent}, 0 0 0 4px rgba(10,132,255,0.3);
       outline: none;
     }
     /* P2-2: MediaCard hover/press 反馈 */
@@ -44,7 +43,9 @@ function injectPopupStyles(theme: import("./lib/design-tokens").ThemeTokens) {
                   box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
     }
     .mc-card-art:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 12px 28px rgba(0,0,0,0.55); }
-    .mc-card-art:active { transform: scale(0.97); }
+    .mc-card-art:active { transform: scale(0.95); }
+    /* hover 时浮现卡片底部信息层(作者) */
+    .mc-card-art:hover .mc-card-info { opacity: 1; }
   `
 }
 
@@ -136,22 +137,6 @@ function Popup() {
 
   // ===== 数据聚合 =====
 
-  // Hero 候选:取最新一条。优先有封面的,降序取最新。
-  const heroItem = useMemo(() => {
-    if (!items.length) return null
-    const sorted = [...items].sort(
-      (a, b) => new Date(b.collectedAt).getTime() - new Date(a.collectedAt).getTime()
-    )
-    // 优先取有封面 URL 的(图集首图或视频 coverUrl)
-    return sorted.find((i) => i.coverUrl) || sorted[0]
-  }, [items])
-
-  // Hero 关联的同 noteId 图片数(仅图集有意义)
-  const heroImageCount = useMemo(() => {
-    if (!heroItem?.noteId) return undefined
-    return items.filter((i) => i.noteId === heroItem.noteId).length
-  }, [items, heroItem])
-
   // 作者聚合
   const authors = useMemo(() => {
     const map = new Map<string, { count: number; firstItem: MediaItem; latest: number }>()
@@ -175,6 +160,19 @@ function Popup() {
       })
       .map(([name, v]) => ({ name, count: v.count, firstItem: v.firstItem }))
   }, [items])
+
+  // 数据看板聚合(§3.4):今日采集数 / 图视分布 / 作者数。纯前端,基于已有 items。
+  const stats = useMemo(() => {
+    const now = new Date()
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    let today = 0, imgCount = 0, videoCount = 0
+    for (const it of items) {
+      if (new Date(it.collectedAt).getTime() >= todayStart) today++
+      if (it.type === "video") videoCount++; else imgCount++
+    }
+    const authorCount = authors.filter((a) => a.name).length // 排除"未分类"空作者
+    return { today, total: items.length, imgCount, videoCount, authorCount }
+  }, [items, authors])
 
   // 每个 noteId 的图片数(给 MediaCard 显示角标用)
   const noteImageCounts = useMemo(() => {
@@ -288,25 +286,10 @@ function Popup() {
     )
   }
 
-  // Hero 直接下载(单图/视频则下载这一项,图集则下载整组)
-  const downloadHeroItems = (targets: MediaItem[]) => {
-    if (!targets.length) return
-    setDownloadError("")
-    chrome.runtime.sendMessage(
-      {
-        type: "BATCH_DOWNLOAD",
-        payload: targets.map((i) => ({
-          url: i.url,
-          filename: buildFilename(i),
-          platform: i.platform,
-        })),
-      },
-      (resp) => {
-        if (!resp?.success) {
-          setDownloadError(resp?.errors?.[0] || "下载失败,请确保打开了小红书/抖音页面")
-        }
-      }
-    )
+  // M1 占位:全屏素材库在 M2 上线。先用底部 Toast 友好提示,避免死按钮。
+  // M2 改为 chrome.tabs.create({ url: chrome.runtime.getURL("tabs/library.html") })
+  const openLibrary = () => {
+    setDownloadError("素材库即将上线,敬请期待 ✨")
   }
 
   // 全选/取消全选当前筛选结果
@@ -381,7 +364,7 @@ function Popup() {
         <div style={styles.ambient} />
         <div style={styles.content}>
           <div style={styles.navbar}>
-            <span style={styles.largetitle}>素材</span>
+            <span style={styles.largetitle}>素材库</span>
           </div>
           <EmptyState />
         </div>
@@ -408,16 +391,36 @@ function Popup() {
               <defs>
                 <linearGradient id="mc-logo-grad" x1="0" y1="0" x2="22" y2="22" gradientUnits="userSpaceOnUse">
                   <stop offset="0%" stopColor="#5AC8FA" />
-                  <stop offset="100%" stopColor="#0066cc" />
+                  <stop offset="100%" stopColor="#0a84ff" />
                 </linearGradient>
               </defs>
               <rect x="3" y="9" width="13" height="10" rx="2.5" fill="url(#mc-logo-grad)" opacity="0.55" />
               <rect x="6" y="3" width="13" height="10" rx="2.5" fill="url(#mc-logo-grad)" />
             </svg>
-            <span style={styles.largetitle}>素材</span>
+            <span style={styles.largetitle}>素材库</span>
             <span style={styles.countBadge} aria-label={`共 ${items.length} 项素材`}>{items.length}</span>
           </div>
           <div style={styles.tools}>
+            {/* M1 占位:打开全屏素材库(M2 上线真实跳转) */}
+            <div
+              style={styles.tool}
+              role="button"
+              tabIndex={0}
+              aria-label="打开素材库(即将上线)"
+              title="素材库(M2 上线)"
+              onClick={openLibrary}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  openLibrary()
+                }
+              }}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M15 3h6v6M21 3l-9 9" />
+                <path d="M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" />
+              </svg>
+            </div>
             {/* P3-21: 主题切换(auto / dark / light 三态循环) */}
             <div
               style={styles.tool}
@@ -478,6 +481,15 @@ function Popup() {
             </div>
           </div>
         </div>
+
+        {/* 数据看板(§3.4):非搜索态显示;搜索时收起聚焦结果 */}
+        {!searchOpen && (
+          <div style={styles.statsRow}>
+            <StatCard value={String(stats.today)} unit="项" label="今日采集" highlight={stats.today > 0} />
+            <StatCard value={String(stats.total)} unit="项" label="素材总量" hint={`图 ${stats.imgCount} · 视频 ${stats.videoCount}`} />
+            <StatCard value={String(stats.authorCount)} unit="位" label="关注作者" />
+          </div>
+        )}
 
         {/* 搜索框 */}
         {searchOpen && (
@@ -614,34 +626,8 @@ function Popup() {
           </>
         )}
 
-        {/* Hero */}
-        {heroItem && (
-          <Hero
-            item={heroItem}
-            count={heroImageCount ?? 1}
-            onClick={() => openPreview(heroItem!)}
-            onDownload={(e) => {
-              e.stopPropagation()
-              const targets = heroItem!.noteId
-                ? items.filter((i) => i.noteId === heroItem!.noteId)
-                : [heroItem!]
-              downloadHeroItems(targets)
-            }}
-            onOpenSource={(e) => {
-              e.stopPropagation()
-              if (heroItem!.sourceUrl) {
-                try {
-                  chrome.tabs.create({ url: heroItem!.sourceUrl, active: false })
-                } catch {}
-              }
-            }}
-          />
-        )}
-
-        {/* 滚动区 */}
+        {/* 滚动区:密集网格(对齐原型——无 Hero、无作者轮播) */}
         <div style={styles.scrollArea}>
-          <AuthorCarousel authors={authors} selectedAuthor={authorFilter} onSelect={setAuthorFilter} />
-
           {TIME_ORDER.map((bucket) => {
             const bucketItems = timeBuckets.get(bucket)
             if (!bucketItems || !bucketItems.length) return null
@@ -758,7 +744,7 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
   },
   logo: {
     flexShrink: 0,
-    filter: "drop-shadow(0 2px 6px rgba(0,102,204,0.35))",
+    filter: "drop-shadow(0 2px 6px rgba(10,132,255,0.35))",
   },
   largetitle: {
     fontSize: theme.fs.display,
@@ -776,6 +762,11 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     verticalAlign: "middle",
   },
   tools: { display: "flex", gap: 6 },
+  statsRow: {
+    display: "flex",
+    gap: theme.sp.xs,
+    padding: `0 ${theme.sp.md}px ${theme.sp.sm}px`,
+  },
   tool: {
     width: theme.btn.sm,
     height: theme.btn.sm,
@@ -801,8 +792,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
   gridCount: { fontSize: theme.fs.caption, color: theme.textTertiary, fontWeight: 500 },
   gridWrap: {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-    gap: theme.sp.sm,
+    gridTemplateColumns: "repeat(4, 1fr)",
+    gap: theme.sp.xs + 2, // 10px,密集但不拥挤
   },
   scrollArea: {
     flex: 1,
@@ -860,8 +851,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     color: theme.textSecondary,
     fontSize: theme.fs.micro + 2, // 13px,提升可读性
     fontWeight: 500,
-    padding: "4px 10px",
-    borderRadius: theme.r.sm,
+    padding: "5px 12px",
+    borderRadius: theme.r.pill, // 对齐原型:胶囊 chip
     cursor: "pointer",
     transition: `all ${theme.durFast} ${theme.easeOut}`,
     fontFamily: "inherit",
@@ -882,18 +873,18 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
   typeSegment: {
     display: "inline-flex",
     background: theme.card,
-    borderRadius: theme.r.sm,
+    borderRadius: theme.r.pill,
     padding: 2,
     gap: 2,
   },
   typeBtn: {
-    width: 26,
+    width: 28,
     height: 22,
     border: "none",
     background: "transparent",
     color: theme.textSecondary,
     cursor: "pointer",
-    borderRadius: theme.r.xs,
+    borderRadius: theme.r.pill,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",

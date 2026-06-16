@@ -87,8 +87,8 @@ export const darkTheme: ThemeTokens = {
   textSecondary: "rgba(255,255,255,0.7)",
   textTertiary: "rgba(255,255,255,0.5)",
 
-  accent: "#0066cc",
-  accentFocus: "#0071e3",
+  accent: "#0a84ff", // 受控偏离:更活泼的系统蓝(产品决策,见设计文档 §4)
+  accentFocus: "#409cff", // focus 态再亮一档
   accentDark: "#2997ff",
   accentLight: "#5AC8FA",
 
@@ -122,8 +122,8 @@ export const darkTheme: ThemeTokens = {
   durFast: "180ms",
   dur: "250ms",
 
-  focusRing: "0 0 0 2px #0066cc",
-  focusRingOffset: "0 0 0 2px #0066cc, 0 0 0 4px rgba(0,102,204,0.25)",
+  focusRing: "0 0 0 2px #0a84ff",
+  focusRingOffset: "0 0 0 2px #0a84ff, 0 0 0 4px rgba(10,132,255,0.25)",
 
   // 深色氛围:从顶部散出红 + 紫双色调,与 Hero 视觉协调
   ambient:
@@ -147,8 +147,8 @@ export const lightTheme: ThemeTokens = {
   textSecondary: "rgba(0,0,0,0.6)",
   textTertiary: "rgba(0,0,0,0.4)",
 
-  accent: "#0066cc",
-  accentFocus: "#0071e3",
+  accent: "#0a84ff", // 受控偏离:与 dark 统一(产品决策,见设计文档 §4)
+  accentFocus: "#0071e3", // 亮底保留稍深 focus,保证对比
   accentDark: "#0058a6", // 深色文字版,浅色背景下够暗
   accentLight: "#5AC8FA",
 
@@ -182,8 +182,8 @@ export const lightTheme: ThemeTokens = {
   durFast: "180ms",
   dur: "250ms",
 
-  focusRing: "0 0 0 2px #0066cc",
-  focusRingOffset: "0 0 0 2px #0066cc, 0 0 0 4px rgba(0,102,204,0.25)",
+  focusRing: "0 0 0 2px #0a84ff",
+  focusRingOffset: "0 0 0 2px #0a84ff, 0 0 0 4px rgba(10,132,255,0.25)",
 
   // 浅色氛围:同色系 radial gradient 但透明度大幅降低(避免在白底上过艳)
   ambient:

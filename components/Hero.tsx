@@ -12,9 +12,11 @@ interface HeroProps {
   onDownload?: (e: React.MouseEvent) => void
   /** 打开原帖 */
   onOpenSource?: (e: React.MouseEvent) => void
+  /** M1:紧凑模式——降低高度,让位给密集网格 */
+  compact?: boolean
 }
 
-export function Hero({ item, count, onClick, onDownload, onOpenSource }: HeroProps) {
+export function Hero({ item, count, onClick, onDownload, onOpenSource, compact }: HeroProps) {
   const theme = useTheme()
   const styles = makeStyles(theme)
   const cover = item.coverUrl || item.url
@@ -35,7 +37,7 @@ export function Hero({ item, count, onClick, onDownload, onOpenSource }: HeroPro
         role="button"
         tabIndex={0}
         aria-label={`预览素材 ${item.title || "未命名素材"}`}
-        style={styles.hero}
+        style={{ ...styles.hero, ...(compact ? { maxHeight: 132 } : {}) }}
       >
         {/* 封面图:加载失败则隐藏,露出渐变底 */}
         {!imgError && (

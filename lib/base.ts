@@ -28,7 +28,7 @@ export function injectStyles() {
     }
     #__mc_btn.mc_on { opacity:1; pointer-events:auto; }
     #__mc_btn:hover { transform:scale(1.12); background:rgba(255,45,85,1); box-shadow:0 3px 12px rgba(255,45,85,0.4); }
-    #__mc_btn:active { transform:scale(0.92); }
+    #__mc_btn:active { transform:scale(0.95); }
     #__mc_btn.mc_done { background:rgba(52,199,89,0.92); }
     #__mc_btn.mc_done:hover { background:rgba(52,199,89,1); box-shadow:0 3px 12px rgba(52,199,89,0.4); }
 

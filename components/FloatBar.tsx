@@ -61,17 +61,17 @@ export function FloatBar({
         )}
       </button>
       <button
-        style={{ ...styles.icon, ...(downloading || nothingSelected ? styles.iconDisabled : {}) }}
+        style={{ ...styles.downloadBtn, ...(downloading || nothingSelected ? styles.downloadBtnDisabled : {}) }}
         onClick={onDownload}
         disabled={downloading || nothingSelected}
-        aria-label="下载选中素材"
+        aria-label="导出选中素材"
         aria-disabled={downloading || nothingSelected}
-        title="下载"
+        title="导出"
       >
         {downloading ? (
           <svg
-            width="18"
-            height="18"
+            width="16"
+            height="16"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -82,12 +82,13 @@ export function FloatBar({
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
         ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
         )}
+        <span>{downloading ? "导出中" : "导出"}</span>
       </button>
       <button
         style={{ ...styles.icon, ...(nothingSelected ? styles.iconDisabled : styles.iconDanger) }}
@@ -183,6 +184,26 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     color: "#fff",
     transition: `transform ${theme.durFast} ${theme.easeSpring}, opacity ${theme.durFast} ${theme.easeOut}`,
   },
+  // 导出主操作:蓝色实心文字按钮(对齐原型,付费核心操作最显眼)
+  downloadBtn: {
+    height: theme.btn.md,
+    padding: "0 14px",
+    borderRadius: theme.r.pill,
+    border: "none",
+    background: theme.accent,
+    color: "#fff",
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    cursor: "pointer",
+    fontSize: theme.fs.caption,
+    fontWeight: 600,
+    fontFamily: "inherit",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+    transition: `transform ${theme.durFast} ${theme.easeSpring}, opacity ${theme.durFast} ${theme.easeOut}`,
+  },
+  downloadBtnDisabled: { opacity: 0.4, cursor: "default" },
   // 警示底色,让删除按钮即使在 idle 态也有"危险"语义
   iconDanger: { background: theme.dangerBg, color: theme.dangerText },
   iconDisabled: { opacity: 0.4, cursor: "default" },

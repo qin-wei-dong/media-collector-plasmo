@@ -88,9 +88,12 @@ export function MediaCard({
             </svg>
           )}
         </button>
+
+        {/* hover 浮现的信息层(对齐原型:作者从底部渐变浮现) */}
+        <div className="mc-card-info" style={styles.info}>
+          <span style={styles.infoText}>{item.author || "未分类"}</span>
+        </div>
       </div>
-      <div style={styles.title}>{item.title || "未命名"}</div>
-      <div style={styles.meta}>{item.author || "未分类"}</div>
     </div>
   )
 }
@@ -167,20 +170,23 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     background: theme.accent,
     borderColor: "#fff",
   },
-  title: {
-    fontSize: theme.fs.caption,
-    fontWeight: 600,
-    marginTop: 7,
-    color: theme.textPrimary,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    letterSpacing: "-0.1px",
+  // hover 浮现的信息层(默认透明,由 injectPopupStyles 的 .mc-card-art:hover 控制显隐)
+  info: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: "16px 8px 6px",
+    background: "linear-gradient(transparent, rgba(0,0,0,0.72))",
+    opacity: 0,
+    transition: `opacity ${theme.durFast} ${theme.easeOut}`,
+    pointerEvents: "none",
   },
-  meta: {
+  infoText: {
     fontSize: theme.fs.micro,
-    color: theme.textTertiary,
-    marginTop: 1,
+    fontWeight: 600,
+    color: "#fff",
+    display: "block",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",

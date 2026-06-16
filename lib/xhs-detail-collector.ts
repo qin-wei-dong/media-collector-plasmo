@@ -132,7 +132,7 @@ function injectStyles() {
       user-select:none;
     }
     #${BTN_ID}:hover { transform:scale(1.05); box-shadow:0 6px 18px rgba(255,45,85,0.55); }
-    #${BTN_ID}:active { transform:scale(0.96); }
+    #${BTN_ID}:active { transform:scale(0.95); }
     #${BTN_ID}.mc_done { background:linear-gradient(135deg,#34c759,#30d158); box-shadow:0 4px 14px rgba(52,199,89,0.4); }
     #${BTN_ID}.mc_loading { opacity:0.75; pointer-events:none; }
   `

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>素材库 — 全屏管理台</title>
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --bg2: #141416;
+    --sidebar: #0d0d0f;
+    --card: rgba(255,255,255,0.05);
+    --card-hover: rgba(255,255,255,0.09);
+    --line: rgba(255,255,255,0.08);
+    --line-soft: rgba(255,255,255,0.05);
+    --t1: #ffffff;
+    --t2: rgba(255,255,255,0.68);
+    --t3: rgba(255,255,255,0.42);
+    --accent: #0a84ff;
+    --accent-soft: rgba(10,132,255,0.16);
+    --xhs: #FF2442;
+    --xhs-bg: rgba(255,36,66,0.14);
+    --douyin: #25F4EE;
+    --douyin-bg: rgba(37,244,238,0.12);
+    --danger: #FF453A;
+    --danger-bg: rgba(255,69,58,0.14);
+    --green: #30d158;
+    --r-sm: 8px; --r-md: 11px; --r-lg: 16px; --pill: 999px;
+    --font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--t1);
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    width: 248px; flex-shrink: 0;
+    background: var(--sidebar);
+    border-right: 1px solid var(--line);
+    display: flex; flex-direction: column;
+    padding: 20px 14px;
+  }
+  .sb-brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 20px; }
+  .sb-logo { width: 30px; height: 30px; border-radius: 8px;
+    background: linear-gradient(135deg, #5AC8FA, #0a84ff);
+    display: grid; place-items: center; box-shadow: 0 4px 12px rgba(10,132,255,0.4); }
+  .sb-logo svg { width: 17px; height: 17px; }
+  .sb-name { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .sb-name small { display: block; font-size: 10px; font-weight: 500; color: var(--t3); letter-spacing: 0.5px; margin-top: 1px; }
+
+  .sb-group { margin-top: 18px; }
+  .sb-group-h { font-size: 11px; font-weight: 600; color: var(--t3); letter-spacing: 0.5px;
+    padding: 0 8px 8px; display: flex; align-items: center; justify-content: space-between; }
+  .sb-group-h .add { cursor: pointer; opacity: 0.6; }
+  .sb-group-h .add:hover { opacity: 1; color: var(--accent); }
+  .sb-item { display: flex; align-items: center; gap: 10px; padding: 8px 9px; border-radius: var(--r-sm);
+    font-size: 13.5px; color: var(--t2); cursor: pointer; transition: all 0.14s var(--ease); }
+  .sb-item:hover { background: var(--card); color: var(--t1); }
+  .sb-item.active { background: var(--accent-soft); color: #4da3ff; font-weight: 600; }
+  .sb-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sb-item .cnt { margin-left: auto; font-size: 11px; color: var(--t3); font-weight: 500; }
+  .sb-item.active .cnt { color: #4da3ff; }
+  .sb-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+  .sb-foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+  .sb-pro { background: linear-gradient(135deg, rgba(10,132,255,0.18), rgba(120,80,255,0.14));
+    border: 1px solid rgba(10,132,255,0.25); border-radius: var(--r-md); padding: 12px; }
+  .sb-pro-t { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .sb-pro-d { font-size: 11px; color: var(--t2); margin: 5px 0 9px; line-height: 1.4; }
+  .sb-pro-btn { width: 100%; border: none; background: var(--accent); color: #fff; font-weight: 600;
+    font-size: 12px; padding: 7px; border-radius: var(--r-sm); cursor: pointer; font-family: var(--font); }
+
+  /* ============ MAIN ============ */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0;
+    background: radial-gradient(ellipse 60% 40% at 20% 0%, rgba(120,80,255,0.06), transparent 60%), var(--bg2); }
+
+  /* ---- toolbar ---- */
+  .toolbar { padding: 18px 28px; display: flex; align-items: center; gap: 14px;
+    border-bottom: 1px solid var(--line); }
+  .tb-title { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
+  .tb-sub { font-size: 12px; color: var(--t3); margin-left: 2px; }
+  .search { flex: 1; max-width: 420px; position: relative; }
+  .search input { width: 100%; background: var(--card); border: 1px solid transparent;
+    border-radius: var(--pill); padding: 9px 14px 9px 38px; color: var(--t1); font-size: 13.5px;
+    font-family: var(--font); outline: none; transition: all 0.16s var(--ease); }
+  .search input:focus { border-color: var(--accent); background: rgba(255,255,255,0.08); }
+  .search input::placeholder { color: var(--t3); }
+  .search svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: var(--t3); }
+  .tb-spacer { flex: 1; }
+  .tb-btn { border: none; background: var(--card); color: var(--t2); border-radius: var(--r-sm);
+    padding: 9px 13px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 7px;
+    font-family: var(--font); transition: all 0.16s var(--ease); }
+  .tb-btn:hover { background: var(--card-hover); color: var(--t1); }
+  .tb-btn svg { width: 15px; height: 15px; }
+  .view-toggle { display: flex; background: var(--card); border-radius: var(--r-sm); padding: 2px; }
+  .view-toggle button { border: none; background: transparent; color: var(--t3); width: 30px; height: 28px;
+    border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
+  .view-toggle button.on { background: rgba(255,255,255,0.14); color: #fff; }
+  .view-toggle svg { width: 15px; height: 15px; }
+
+  /* ---- stats dashboard ---- */
+  .dash { display: flex; gap: 12px; padding: 18px 28px 4px; }
+  .dcard { flex: 1; background: var(--card); border: 1px solid var(--line-soft); border-radius: var(--r-md);
+    padding: 14px 16px; position: relative; overflow: hidden; }
+  .dcard-label { font-size: 12px; color: var(--t3); display: flex; align-items: center; gap: 6px; }
+  .dcard-label svg { width: 14px; height: 14px; }
+  .dcard-num { font-size: 26px; font-weight: 700; letter-spacing: -0.6px; margin-top: 6px; line-height: 1; }
+  .dcard-num .unit { font-size: 13px; font-weight: 500; color: var(--t3); margin-left: 3px; }
+  .dcard-trend { font-size: 11px; margin-top: 5px; color: var(--green); font-weight: 600; }
+  .dcard .spark { position: absolute; right: 14px; bottom: 12px; opacity: 0.6; }
+
+  /* ---- active filter / bulk bar ---- */
+  .subbar { padding: 14px 28px; display: flex; align-items: center; gap: 10px; }
+  .chip { font-size: 12.5px; font-weight: 500; color: var(--t2);
+    background: var(--card); border: none; padding: 6px 12px; border-radius: var(--pill);
+    cursor: pointer; transition: all 0.14s var(--ease); display: inline-flex; align-items: center; gap: 6px; }
+  .chip:hover { background: var(--card-hover); }
+  .chip.active { color: #fff; background: var(--accent); }
+  .chip.xhs.active { background: var(--xhs); }
+  .chip.dy.active { background: var(--douyin); color: #062a29; }
+  .chip .x { font-size: 14px; opacity: 0.7; }
+  .subbar .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .sel-text { font-size: 13px; color: var(--t2); }
+  .sel-text b { color: #fff; }
+  .bulk-btn { border: none; border-radius: var(--r-sm); padding: 8px 15px; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 7px; font-family: var(--font);
+    transition: all 0.16s var(--ease); }
+  .bulk-btn svg { width: 15px; height: 15px; }
+  .bulk-btn.go { background: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(10,132,255,0.35); }
+  .bulk-btn.go:hover { background: #0a90ff; }
+  .bulk-btn.ghost { background: var(--card); color: var(--t2); }
+  .bulk-btn.ghost:hover { background: var(--card-hover); color: #fff; }
+  .bulk-btn.danger { background: var(--danger-bg); color: var(--danger); }
+
+  /* ---- content grid ---- */
+  .content { flex: 1; overflow-y: auto; padding: 4px 28px 40px; }
+  .content::-webkit-scrollbar { width: 8px; }
+  .content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+  .sec-h { font-size: 13px; font-weight: 600; color: var(--t3); letter-spacing: 0.3px;
+    margin: 18px 0 12px; display: flex; align-items: center; gap: 8px; }
+  .sec-h::after { content: ""; flex: 1; height: 1px; background: var(--line-soft); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .cell { position: relative; aspect-ratio: 1; border-radius: var(--r-md); overflow: hidden;
+    background: var(--card); cursor: pointer; transition: transform 0.18s var(--ease), box-shadow 0.18s var(--ease); }
+  .cell:hover { transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0,0,0,0.5); }
+  .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cell .badge { position: absolute; top: 8px; left: 8px; font-size: 11px; font-weight: 700;
+    color: #fff; background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+    padding: 3px 8px; border-radius: var(--pill); display: flex; align-items: center; gap: 4px; }
+  .cell .pf { position: absolute; top: 8px; left: 8px; width: 7px; height: 7px; border-radius: 50%; }
+  .cell .vbadge { position: absolute; bottom: 8px; right: 8px; width: 24px; height: 24px;
+    border-radius: 50%; background: rgba(0,0,0,0.5); backdrop-filter: blur(6px); display: grid; place-items: center; }
+  .cell .vbadge svg { width: 12px; height: 12px; fill: #fff; }
+  .cell .check { position: absolute; top: 8px; right: 8px; width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.85); background: rgba(0,0,0,0.25); backdrop-filter: blur(4px);
+    opacity: 0; transition: all 0.16s var(--ease); }
+  .cell:hover .check { opacity: 1; }
+  .cell.sel .check { opacity: 1; background: var(--accent); border-color: var(--accent); }
+  .cell.sel { outline: 3px solid var(--accent); outline-offset: -3px; }
+  .cell.sel .check::after { content: ""; position: absolute; left: 6px; top: 2.5px; width: 5px; height: 10px;
+    border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  .cell .info { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 10px 9px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.78)); opacity: 0; transition: opacity 0.16s; }
+  .cell:hover .info { opacity: 1; }
+  .cell .info-author { font-size: 11.5px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cell .info-actions { display: flex; gap: 6px; margin-top: 7px; }
+  .cell .mini { width: 26px; height: 26px; border-radius: 7px; background: rgba(255,255,255,0.16);
+    backdrop-filter: blur(8px); border: none; cursor: pointer; display: grid; place-items: center; color: #fff; }
+  .cell .mini:hover { background: rgba(255,255,255,0.28); }
+  .cell .mini svg { width: 13px; height: 13px; }
+
+  /* ---- export panel (right drawer mock) ---- */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: rgba(40,40,42,0.92); backdrop-filter: blur(30px); border: 1px solid var(--line);
+    border-radius: var(--r-md); padding: 12px 18px; display: flex; align-items: center; gap: 14px;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.5); font-size: 13px; }
+  .toast .ok { width: 22px; height: 22px; border-radius: 50%; background: var(--green); display: grid; place-items: center; }
+  .toast .ok svg { width: 13px; height: 13px; }
+  .toast a { color: var(--accent); font-weight: 600; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- ============ SIDEBAR ============ -->
+<aside class="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo"><svg viewBox="0 0 22 22" fill="none"><rect x="3" y="9" width="13" height="10" rx="2.5" fill="#fff" opacity="0.55"/><rect x="6" y="3" width="13" height="10" rx="2.5" fill="#fff"/></svg></div>
+    <div class="sb-name">素材库<small>MEDIA COLLECTOR</small></div>
+  </div>
+
+  <div class="sb-group">
+    <div class="sb-item active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>全部素材<span class="cnt">128</span></div>
+    <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>最近采集<span class="cnt">12</span></div>
+    <div class="sb-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>未分类<span class="cnt">43</span></div>
+  </div>
+
+  <div class="sb-group">
+    <div class="sb-group-h">我的收藏夹 <span class="add">+ 新建</span></div>
+    <div class="sb-item"><span class="sb-dot" style="background:#FF5A5F"></span>618 选题<span class="cnt">26</span></div>
+    <div class="sb-item"><span class="sb-dot" style="background:#5AC8FA"></span>穿搭对标<span class="cnt">31</span></div>
+    <div class="sb-item"><span class="sb-dot" style="background:#FFD60A"></span>美食探店<span class="cnt">18</span></div>
+    <div class="sb-item"><span class="sb-dot" style="background:#AF52DE"></span>口播脚本灵感<span class="cnt">10</span></div>
+  </div>
+
+  <div class="sb-group">
+    <div class="sb-group-h">平台</div>
+    <div class="sb-item"><span class="sb-dot" style="background:var(--xhs)"></span>小红书<span class="cnt">89</span></div>
+    <div class="sb-item"><span class="sb-dot" style="background:var(--douyin)"></span>抖音<span class="cnt">39</span></div>
+  </div>
+
+  <div class="sb-foot">
+    <div class="sb-pro">
+      <div class="sb-pro-t">✦ 升级 Pro</div>
+      <div class="sb-pro-d">解锁无限收藏夹、批量分文件夹导出、云端同步</div>
+      <button class="sb-pro-btn">立即升级</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ============ MAIN ============ -->
+<main class="main">
+  <!-- toolbar -->
+  <div class="toolbar">
+    <div class="tb-title">全部素材</div>
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+      <input placeholder="搜索标题、作者…  (⌘K)">
+    </div>
+    <div class="tb-spacer"></div>
+    <button class="tb-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>排序</button>
+    <div class="view-toggle">
+      <button class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></button>
+      <button><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></button>
+    </div>
+  </div>
+
+  <!-- dashboard -->
+  <div class="dash">
+    <div class="dcard">
+      <div class="dcard-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/></svg>今日采集</div>
+      <div class="dcard-num">12<span class="unit">项</span></div>
+      <div class="dcard-trend">↑ 较昨日 +50%</div>
+    </div>
+    <div class="dcard">
+      <div class="dcard-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>素材总量</div>
+      <div class="dcard-num">128<span class="unit">项</span></div>
+      <div class="dcard-trend" style="color:var(--t3)">图 96 · 视频 32</div>
+    </div>
+    <div class="dcard">
+      <div class="dcard-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>关注作者</div>
+      <div class="dcard-num">16<span class="unit">位</span></div>
+      <div class="dcard-trend" style="color:var(--t3)">@穿搭日记 最多 (23)</div>
+    </div>
+    <div class="dcard">
+      <div class="dcard-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>本周已导出</div>
+      <div class="dcard-num">47<span class="unit">项</span></div>
+      <div class="dcard-trend">↑ 高效产出中</div>
+    </div>
+  </div>
+
+  <!-- subbar: filters + bulk -->
+  <div class="subbar">
+    <button class="chip active">全部</button>
+    <button class="chip xhs">小红书</button>
+    <button class="chip dy">抖音</button>
+    <button class="chip"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>图片</button>
+    <button class="chip">视频</button>
+    <div class="right">
+      <span class="sel-text">已选 <b>8</b> 项</span>
+      <button class="bulk-btn ghost"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>加入收藏夹</button>
+      <button class="bulk-btn go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出 8 项</button>
+      <button class="bulk-btn danger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
+    </div>
+  </div>
+
+  <!-- content -->
+  <div class="content">
+    <div class="sec-h">今天 · 12 项</div>
+    <div class="grid">
+      <div class="cell sel"><img src="https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=300&h=300&fit=crop"><span class="badge">📷 9</span><div class="check"></div><div class="info"><div class="info-author">@穿搭日记</div><div class="info-actions"><button class="mini"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button><button class="mini"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M21 3l-9 9"/></svg></button></div></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1483985988355-763728e1935b?w=300&h=300&fit=crop"><span class="pf" style="background:var(--xhs)"></span><div class="check"></div><div class="info"><div class="info-author">@时尚芮</div></div></div>
+      <div class="cell sel"><img src="https://images.unsplash.com/photo-1445205170230-053b83016050?w=300&h=300&fit=crop"><span class="badge">📷 6</span><div class="check"></div><div class="info"><div class="info-author">@美食日常</div></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=300&h=300&fit=crop"><div class="vbadge"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div><div class="check"></div><div class="info"><div class="info-author">@旅行的意义</div></div></div>
+      <div class="cell sel"><img src="https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=300&h=300&fit=crop"><span class="pf" style="background:var(--xhs)"></span><div class="check"></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1469827160215-9d29e96e72f4?w=300&h=300&fit=crop"><span class="pf" style="background:var(--xhs)"></span><div class="check"></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=300&h=300&fit=crop"><div class="vbadge"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div><div class="check"></div><div class="info"><div class="info-author">@好物推荐官</div></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1492707892479-7bc8d5a4ee93?w=300&h=300&fit=crop"><span class="pf" style="background:var(--douyin)"></span><div class="check"></div></div>
+    </div>
+
+    <div class="sec-h">昨天 · 24 项</div>
+    <div class="grid">
+      <div class="cell"><img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=300&h=300&fit=crop"><span class="badge">📷 4</span><div class="check"></div></div>
+      <div class="cell sel"><img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop"><span class="pf" style="background:var(--xhs)"></span><div class="check"></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=300&h=300&fit=crop"><div class="check"></div></div>
+      <div class="cell sel"><img src="https://images.unsplash.com/photo-1488161628813-04466f872be2?w=300&h=300&fit=crop"><div class="vbadge"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></div><div class="check"></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1502823403499-6ccfcf4fb453?w=300&h=300&fit=crop"><span class="pf" style="background:var(--xhs)"></span><div class="check"></div></div>
+      <div class="cell sel"><img src="https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=300&h=300&fit=crop"><div class="check"></div></div>
+      <div class="cell"><img src="https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=300&h=300&fit=crop"><div class="check"></div></div>
+    </div>
+  </div>
+
+  <!-- success toast -->
+  <div class="toast">
+    <span class="ok"><svg viewBox="0 0 24 24" fill="none" stroke="#062a10" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></span>
+    <span>已导出 <b>8</b> 项到 <b>素材库/618选题/</b> 文件夹</span>
+    <a>打开文件夹</a>
+  </div>
+</main>
+
+</body>
+</html>
