@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react"
 import type { MediaItem } from "../types"
 import { useTheme } from "../lib/use-theme"
+import type { ThemeTokens } from "../lib/design-tokens"
 
 interface PreviewModalProps {
   item: MediaItem
@@ -12,6 +13,7 @@ interface PreviewModalProps {
 
 export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewModalProps) {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   const [imgLoading, setImgLoading] = useState(true)
   const [imgError, setImgError] = useState(false)
   const currentIndex = siblings.findIndex((i) => i.id === item.id)
@@ -175,7 +177,7 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   overlay: {
     position: "absolute",
     inset: 0,
@@ -332,4 +334,4 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "inherit",
     transition: `all ${theme.durFast} ${theme.easeOut}`,
   },
-}
+})

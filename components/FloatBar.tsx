@@ -1,6 +1,7 @@
 // components/FloatBar.tsx — 深色重度磨砂浮动操作栏
 // 删除交互改为:点击立即删除 + 底部 Toast「已删除 N 项」+ 5 秒可撤销(P0-4)
 import { useTheme } from "../lib/use-theme"
+import type { ThemeTokens } from "../lib/design-tokens"
 
 interface FloatBarProps {
   selectedCount: number
@@ -20,6 +21,7 @@ export function FloatBar({
   onToggleSelectAll,
 }: FloatBarProps) {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   const allSelected = totalCount > 0 && selectedCount >= totalCount
   const nothingSelected = selectedCount === 0
 
@@ -104,7 +106,7 @@ export function FloatBar({
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   bar: {
     position: "absolute",
     bottom: 12,
@@ -184,4 +186,4 @@ const styles: Record<string, React.CSSProperties> = {
   // 警示底色,让删除按钮即使在 idle 态也有"危险"语义
   iconDanger: { background: theme.dangerBg, color: theme.dangerText },
   iconDisabled: { opacity: 0.4, cursor: "default" },
-}
+})

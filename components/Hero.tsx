@@ -2,19 +2,21 @@
 import { useState } from "react"
 import type { MediaItem } from "../types"
 import { useTheme } from "../lib/use-theme"
+import type { ThemeTokens } from "../lib/design-tokens"
 
 interface HeroProps {
   item: MediaItem
   count: number
   onClick?: () => void
-  /** P1-1: 下载当前素材(图集则下载整组) */
+  /** 下载当前素材(图集则下载整组) */
   onDownload?: (e: React.MouseEvent) => void
-  /** P1-1: 打开原帖 */
+  /** 打开原帖 */
   onOpenSource?: (e: React.MouseEvent) => void
 }
 
 export function Hero({ item, count, onClick, onDownload, onOpenSource }: HeroProps) {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   const cover = item.coverUrl || item.url
   const isVideo = item.type === "video"
   const [imgError, setImgError] = useState(false)
@@ -46,7 +48,7 @@ export function Hero({ item, count, onClick, onDownload, onOpenSource }: HeroPro
         )}
         <div style={styles.overlay} />
 
-        {/* P1-1: 快速操作(右上角,玻璃质感) */}
+        {/* 快速操作(右上角,玻璃质感) */}
         {(onDownload || hasSource) && (
           <div style={styles.actions}>
             {onDownload && (
@@ -102,7 +104,7 @@ export function Hero({ item, count, onClick, onDownload, onOpenSource }: HeroPro
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   wrap: { padding: `0 ${theme.sp.md}px ${theme.sp.sm}px` },
   hero: {
     position: "relative",
@@ -192,4 +194,4 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-}
+})

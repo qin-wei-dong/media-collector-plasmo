@@ -3,6 +3,7 @@ import { useEffect, useState } from "react"
 import type { MediaItem } from "../types"
 import { getAvatarGradient } from "../lib/design-tokens"
 import { useTheme } from "../lib/use-theme"
+import type { ThemeTokens } from "../lib/design-tokens"
 
 interface AuthorCarouselProps {
   authors: Array<{ name: string; count: number; firstItem: MediaItem }>
@@ -14,6 +15,7 @@ interface AuthorCarouselProps {
 /** 单个头像的加载状态管理(避免互相干扰) */
 function AuthorAvatar({ author, isActive }: { author: { name: string; count: number; firstItem: MediaItem }; isActive: boolean }) {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   const [imgLoaded, setImgLoaded] = useState(false)
   const [imgError, setImgError] = useState(false)
   const cover = author.firstItem.coverUrl
@@ -70,6 +72,7 @@ function AuthorAvatar({ author, isActive }: { author: { name: string; count: num
 
 export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible = 5 }: AuthorCarouselProps) {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   const [expanded, setExpanded] = useState(false)
   const [showScrollHint, setShowScrollHint] = useState(true)
   if (!authors.length) return null
@@ -174,7 +177,7 @@ export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible =
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   section: { padding: `0 0 ${theme.sp.sm + 2}px` },
   head: {
     display: "flex",
@@ -288,4 +291,4 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#fff",
     fontWeight: 600,
   },
-}
+})

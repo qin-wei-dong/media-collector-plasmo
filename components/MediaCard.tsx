@@ -2,6 +2,7 @@
 import { useState } from "react"
 import type { MediaItem } from "../types"
 import { useTheme } from "../lib/use-theme"
+import type { ThemeTokens } from "../lib/design-tokens"
 
 interface MediaCardProps {
   item: MediaItem
@@ -21,6 +22,7 @@ export function MediaCard({
   onToggleSelect,
 }: MediaCardProps) {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   const cover = item.coverUrl || item.url
   const isVideo = item.type === "video"
   const [imgError, setImgError] = useState(false)
@@ -93,7 +95,7 @@ export function MediaCard({
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   card: {
     width: "100%",
     position: "relative",
@@ -183,4 +185,4 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-}
+})

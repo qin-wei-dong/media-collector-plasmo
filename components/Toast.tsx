@@ -1,6 +1,7 @@
 // components/Toast.tsx — 底部 Snackbar(支持 action 按钮 + 自动消失)
 import { useEffect } from "react"
 import { useTheme } from "../lib/use-theme"
+import type { ThemeTokens } from "../lib/design-tokens"
 
 interface ToastProps {
   message: string
@@ -23,6 +24,7 @@ export function Toast({
   onDismiss,
 }: ToastProps) {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   // duration 毫秒后自动消失
   useEffect(() => {
     const timer = window.setTimeout(onDismiss, duration)
@@ -59,7 +61,7 @@ export function Toast({
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   toast: {
     position: "absolute",
     bottom: 76, // 浮在 FloatBar 上方
@@ -115,4 +117,4 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.accent,
     transition: "width 0.1s linear",
   },
-}
+})

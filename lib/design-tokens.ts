@@ -44,6 +44,10 @@ export interface ThemeTokens {
   // ===== 字号(6 档) =====
   fs: { micro: number; caption: number; body: number; bodyLg: number; title: number; display: number }
 
+  // ===== 分割线 =====
+  hairline: string
+  hairlineSoft: string
+
   // ===== 磨砂玻璃 =====
   glass: string
   glassBlur: string
@@ -102,6 +106,9 @@ export const darkTheme: ThemeTokens = {
   btn: { xs: 22, sm: 30, md: 38, lg: 40 },
   fs: { micro: 11, caption: 12, body: 14, bodyLg: 15, title: 17, display: 26 },
 
+  hairline: "rgba(255,255,255,0.08)",
+  hairlineSoft: "rgba(255,255,255,0.05)",
+
   glass: "rgba(255,255,255,0.08)",
   glassBlur: "saturate(180%) blur(20px)",
   glassBlurStrong: "saturate(180%) blur(30px)",
@@ -158,6 +165,9 @@ export const lightTheme: ThemeTokens = {
   sp: { xxs: 4, xs: 8, sm: 12, md: 17, lg: 24, xl: 32, xxl: 48 },
   btn: { xs: 22, sm: 30, md: 38, lg: 40 },
   fs: { micro: 11, caption: 12, body: 14, bodyLg: 15, title: 17, display: 26 },
+
+  hairline: "rgba(0,0,0,0.08)",
+  hairlineSoft: "rgba(0,0,0,0.05)",
 
   glass: "rgba(255,255,255,0.6)",
   glassBlur: "saturate(180%) blur(20px)",

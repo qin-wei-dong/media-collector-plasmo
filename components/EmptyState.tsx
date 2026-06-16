@@ -1,8 +1,10 @@
 // components/EmptyState.tsx — 三步图示空状态
 import { useTheme } from "../lib/use-theme"
+import type { ThemeTokens } from "../lib/design-tokens"
 
 export function EmptyState() {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   return (
     <div style={styles.empty}>
       <div style={styles.illust}>
@@ -87,6 +89,7 @@ function Step({
   icon: React.ReactNode
 }) {
   const theme = useTheme()
+  const stylesLocal = makeStylesLocal(theme)
   return (
     <div style={stylesLocal.step}>
       <div style={{ ...stylesLocal.stepNum, backgroundImage: gradient }}>{icon}</div>
@@ -99,7 +102,7 @@ function Step({
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   empty: {
     flex: 1,
     display: "flex",
@@ -164,9 +167,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "inherit",
     color: theme.textSecondary,
   },
-}
+})
 
-const stylesLocal: Record<string, React.CSSProperties> = {
+const makeStylesLocal = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   step: { display: "flex", alignItems: "center", gap: theme.sp.sm },
   stepNum: {
     width: theme.btn.lg,
@@ -181,4 +184,4 @@ const stylesLocal: Record<string, React.CSSProperties> = {
   stepTitle: { fontSize: theme.fs.body, fontWeight: 600, marginBottom: 1 },
   stepDesc: { fontSize: theme.fs.caption, color: theme.textTertiary, lineHeight: 1.4 },
   stepBadge: { fontSize: theme.fs.micro, fontWeight: 700, color: "rgba(255,255,255,0.35)" },
-}
+})

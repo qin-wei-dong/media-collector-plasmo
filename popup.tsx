@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import type { MediaItem } from "./types"
 import { getTimeBucket, TIME_ORDER } from "./lib/design-tokens"
 import { ThemeProvider, useTheme, useThemeControl } from "./lib/use-theme"
+import type { ThemeTokens } from "./lib/design-tokens"
 import { Hero } from "./components/Hero"
 import { AuthorCarousel } from "./components/AuthorCarousel"
 import { FloatBar } from "./components/FloatBar"
@@ -49,6 +50,7 @@ function injectPopupStyles(theme: import("./lib/design-tokens").ThemeTokens) {
 
 function Popup() {
   const theme = useTheme()
+  const styles = makeStyles(theme)
   const { mode: themeMode, cycleMode } = useThemeControl()
   const [items, setItems] = useState<MediaItem[]>([])
   const [batchDownloading, setBatchDownloading] = useState(false)
@@ -286,7 +288,7 @@ function Popup() {
     )
   }
 
-  // P1-1: Hero 直接下载(单图/视频则下载这一项,图集则下载整组)
+  // Hero 直接下载(单图/视频则下载这一项,图集则下载整组)
   const downloadHeroItems = (targets: MediaItem[]) => {
     if (!targets.length) return
     setDownloadError("")
@@ -620,7 +622,6 @@ function Popup() {
             onClick={() => openPreview(heroItem!)}
             onDownload={(e) => {
               e.stopPropagation()
-              // 图集:下载整组;单图/视频:仅下载这一项
               const targets = heroItem!.noteId
                 ? items.filter((i) => i.noteId === heroItem!.noteId)
                 : [heroItem!]
@@ -717,7 +718,7 @@ function Popup() {
   )
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => ({
   root: {
     width: 460,
     height: 660,
@@ -927,7 +928,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: 16,
     height: 16,
   },
-}
+})
 
 export default function PopupWithTheme() {
   return (
