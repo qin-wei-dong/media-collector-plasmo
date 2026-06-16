@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
-    "package": "plasmo package"
+    "package": "plasmo package",
+    "audit:a11y": "node scripts/a11y-audit.mjs"
   },
   "dependencies": {
     "plasmo": "0.90.5",
@@ -17,6 +18,8 @@
     "@types/chrome": "^0.0.260",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "axe-core": "^4.12.1",
+    "puppeteer-core": "^25.1.0",
     "typescript": "^5"
   },
   "manifest": {

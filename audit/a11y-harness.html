@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>素材采集助手</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>html, body {
+  background: none;
+  border-radius: 20px;
+  width: 460px;
+  height: 660px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+#__plasmo {
+  background: none;
+  border-radius: 20px;
+  height: 100%;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: none;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ffffff26;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ffffff40;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #ffffff26 transparent;
+}
+
+</style>
+  </head>
+  <body>
+
+<script>
+(function () {
+  const sample = [
+    {
+      id: "1", url: "https://example.com/1.jpg", type: "image",
+      platform: "xiaohongshu", title: "示例小红书笔记 A",
+      sourceUrl: "https://www.xiaohongshu.com/explore/abc",
+      collectedAt: new Date(Date.now() - 3600 * 1000).toISOString(),
+      author: "示例作者甲", noteId: "n1", groupIndex: 0,
+      coverUrl: "https://example.com/cover1.jpg", width: 1080, height: 1440
+    },
+    {
+      id: "2", url: "https://example.com/2.jpg", type: "image",
+      platform: "xiaohongshu", title: "示例小红书笔记 A",
+      sourceUrl: "https://www.xiaohongshu.com/explore/abc",
+      collectedAt: new Date(Date.now() - 3600 * 1000).toISOString(),
+      author: "示例作者甲", noteId: "n1", groupIndex: 1,
+      coverUrl: "https://example.com/cover1.jpg"
+    },
+    {
+      id: "3", url: "https://example.com/3.mp4", type: "video",
+      platform: "douyin", title: "抖音视频示例",
+      sourceUrl: "https://www.douyin.com/video/xyz",
+      collectedAt: new Date(Date.now() - 86400 * 1000).toISOString(),
+      author: "示例作者乙", coverUrl: "https://example.com/cover3.jpg"
+    },
+    {
+      id: "4", url: "https://example.com/4.jpg", type: "image",
+      platform: "xiaohongshu", title: "昨天的笔记",
+      sourceUrl: "https://www.xiaohongshu.com/explore/def",
+      collectedAt: new Date(Date.now() - 86400 * 1000 * 2).toISOString(),
+      author: "示例作者丙", coverUrl: "https://example.com/cover4.jpg"
+    }
+  ]
+  const storageData = {}
+  const handlers = {
+    GET_ITEMS: () => ({ items: sample }),
+    COLLECT_MEDIA: () => ({ success: true }),
+    COLLECT_NOTE_IMAGES: () => ({ success: true }),
+    BATCH_DOWNLOAD: () => ({ success: true, errors: [] }),
+    REMOVE_ITEMS: () => ({ success: true }),
+    RESTORE_ITEMS: () => ({ success: true, restored: 1 }),
+    INJECT_MAIN_WORLD: () => ({ success: true }),
+    GET_LAST_MEDIA: () => ({ media: null }),
+    CLEAR_ITEMS: () => ({ success: true }),
+  }
+  window.chrome = {
+    runtime: {
+      id: "test-extension-id",
+      sendMessage: (msg, cb) => {
+        const reply = handlers[msg?.type] ? handlers[msg.type]() : { success: false, error: "mock-no-handler" }
+        if (typeof cb === "function") setTimeout(() => cb(reply), 0)
+      },
+      lastError: null,
+      getURL: (p) => p,
+      onMessage: { addListener: () => {} }
+    },
+    storage: {
+      local: {
+        get: (k, cb) => {
+          const keys = Array.isArray(k) ? k : [k]
+          const out = {}
+          keys.forEach((key) => { if (key in storageData) out[key] = storageData[key] })
+          if (typeof cb === "function") setTimeout(() => cb(out), 0)
+          return Promise.resolve(out)
+        },
+        set: (obj, cb) => {
+          Object.assign(storageData, obj)
+          if (typeof cb === "function") setTimeout(() => cb(), 0)
+          return Promise.resolve()
+        }
+      }
+    },
+    tabs: { create: () => {} },
+    notifications: { create: () => {} }
+  }
+})()
+</script>
+
+    <div id="__plasmo"></div>
+  <div id="__plasmo"></div><script src="/popup.7d3dc21e.js" defer=""></script></body>
+</html>
