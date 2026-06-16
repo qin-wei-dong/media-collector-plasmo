@@ -63,6 +63,9 @@ export interface ThemeTokens {
   // ===== Focus ring(键盘可达性) =====
   focusRing: string
   focusRingOffset: string
+
+  // ===== 氛围背景(由 Hero 封面色渗入) =====
+  ambient: string
 }
 
 /**
@@ -114,13 +117,70 @@ export const darkTheme: ThemeTokens = {
 
   focusRing: "0 0 0 2px #0066cc",
   focusRingOffset: "0 0 0 2px #0066cc, 0 0 0 4px rgba(0,102,204,0.25)",
+
+  // 深色氛围:从顶部散出红 + 紫双色调,与 Hero 视觉协调
+  ambient:
+    "radial-gradient(ellipse 70% 45% at 30% 0%, rgba(255,90,95,0.22), transparent 60%)," +
+    "radial-gradient(ellipse 65% 55% at 85% 25%, rgba(120,80,255,0.18), transparent 55%)," +
+    "linear-gradient(180deg, #0a0a0c 0%, #1c1c1e 100%)",
 }
 
 /**
- * Light theme — P3-21 完整填充;P3-19 范围先 fall back 到 darkTheme
- * 留空会让 P3-19 build 通过,但 light 模式实际仍显示 dark(等 P3-21 落地)
+ * Light theme — Apple 暖白 + 浅灰,Apple Music 风格
+ * 阴影更轻,玻璃背景近白,文字反相
  */
-export const lightTheme: ThemeTokens = darkTheme
+export const lightTheme: ThemeTokens = {
+  bg: "#ffffff",
+  bgGradient: "#f5f5f7",
+  card: "rgba(0,0,0,0.04)",
+  cardHover: "rgba(0,0,0,0.08)",
+  floatBar: "rgba(255,255,255,0.72)",
+
+  textPrimary: "#1d1d1f",
+  textSecondary: "rgba(0,0,0,0.6)",
+  textTertiary: "rgba(0,0,0,0.4)",
+
+  accent: "#0066cc",
+  accentFocus: "#0071e3",
+  accentDark: "#0058a6", // 深色文字版,浅色背景下够暗
+  accentLight: "#5AC8FA",
+
+  danger: "#FF3B30",
+  dangerBg: "rgba(255,59,48,0.10)",
+  dangerText: "#D70015",
+
+  xhs: "#FF2442",
+  xhsBg: "rgba(255,36,66,0.10)",
+  douyin: "#0FB8B0", // light 模式 cyan 调暗一些,在白底上够对比
+  douyinBg: "rgba(15,184,176,0.10)",
+
+  r: { xs: 5, sm: 8, md: 11, lg: 18, pill: 9999 },
+  sp: { xxs: 4, xs: 8, sm: 12, md: 17, lg: 24, xl: 32, xxl: 48 },
+  btn: { xs: 22, sm: 30, md: 38, lg: 40 },
+  fs: { micro: 11, caption: 12, body: 14, bodyLg: 15, title: 17, display: 26 },
+
+  glass: "rgba(255,255,255,0.6)",
+  glassBlur: "saturate(180%) blur(20px)",
+  glassBlurStrong: "saturate(180%) blur(30px)",
+
+  shadowCard: "0 4px 14px rgba(0,0,0,0.08)",
+  shadowHero: "0 8px 24px rgba(0,0,0,0.10)",
+  shadowFloat: "0 8px 24px rgba(0,0,0,0.10)",
+
+  easeSpring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+  easeOut: "cubic-bezier(0.16, 1, 0.3, 1)",
+  durFast: "180ms",
+  dur: "250ms",
+
+  focusRing: "0 0 0 2px #0066cc",
+  focusRingOffset: "0 0 0 2px #0066cc, 0 0 0 4px rgba(0,102,204,0.25)",
+
+  // 浅色氛围:同色系 radial gradient 但透明度大幅降低(避免在白底上过艳)
+  ambient:
+    "radial-gradient(ellipse 70% 45% at 30% 0%, rgba(255,90,95,0.06), transparent 60%)," +
+    "radial-gradient(ellipse 65% 55% at 85% 25%, rgba(120,80,255,0.05), transparent 55%)," +
+    "linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%)",
+}
 
 // ===== 头像渐变(不依赖主题,放一起便于维护) =====
 

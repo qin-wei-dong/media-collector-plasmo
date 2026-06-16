@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
 import type { MediaItem } from "./types"
 import { getTimeBucket, TIME_ORDER } from "./lib/design-tokens"
-import { ThemeProvider, useTheme } from "./lib/use-theme"
+import { ThemeProvider, useTheme, useThemeControl } from "./lib/use-theme"
 import { Hero } from "./components/Hero"
 import { AuthorCarousel } from "./components/AuthorCarousel"
 import { FloatBar } from "./components/FloatBar"
@@ -49,6 +49,7 @@ function injectPopupStyles(theme: import("./lib/design-tokens").ThemeTokens) {
 
 function Popup() {
   const theme = useTheme()
+  const { mode: themeMode, cycleMode } = useThemeControl()
   const [items, setItems] = useState<MediaItem[]>([])
   const [batchDownloading, setBatchDownloading] = useState(false)
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
@@ -415,6 +416,40 @@ function Popup() {
             <span style={styles.countBadge} aria-label={`共 ${items.length} 项素材`}>{items.length}</span>
           </div>
           <div style={styles.tools}>
+            {/* P3-21: 主题切换(auto / dark / light 三态循环) */}
+            <div
+              style={styles.tool}
+              role="button"
+              tabIndex={0}
+              aria-label={`主题: ${themeMode},点击切换`}
+              title={`主题: ${themeMode === "auto" ? "跟随系统" : themeMode === "dark" ? "深色" : "浅色"} (点击切换)`}
+              onClick={cycleMode}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  cycleMode()
+                }
+              }}
+            >
+              {themeMode === "dark" && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                </svg>
+              )}
+              {themeMode === "light" && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+                </svg>
+              )}
+              {themeMode === "auto" && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <rect x="2" y="3" width="20" height="14" rx="2" />
+                  <line x1="8" y1="21" x2="16" y2="21" />
+                  <line x1="12" y1="17" x2="12" y2="21" />
+                </svg>
+              )}
+            </div>
             <div
               style={{ ...styles.tool, ...(searchOpen ? styles.toolActive : {}) }}
               title="搜索 (Cmd+K)"
@@ -693,15 +728,12 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: "hidden",
     borderRadius: 20,
   },
-  // 氛围色背景(从 Hero 封面色渗入)
+  // 氛围色背景(P3-21:从主题取,自动适配 dark / light)
   ambient: {
     position: "absolute",
     inset: 0,
     zIndex: 0,
-    background:
-      "radial-gradient(ellipse 70% 45% at 30% 0%, rgba(255,90,95,0.22), transparent 60%)," +
-      "radial-gradient(ellipse 65% 55% at 85% 25%, rgba(120,80,255,0.18), transparent 55%)," +
-      `linear-gradient(180deg, ${theme.bg} 0%, ${theme.bgGradient} 100%)`,
+    background: theme.ambient,
   },
   content: {
     position: "absolute",
