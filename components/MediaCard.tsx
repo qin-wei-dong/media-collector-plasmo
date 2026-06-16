@@ -1,7 +1,7 @@
 // components/MediaCard.tsx — 单素材封面卡(点击预览,圆圈选中)
 import { useState } from "react"
 import type { MediaItem } from "../types"
-import { theme } from "../popup-theme"
+import { useTheme } from "../lib/use-theme"
 
 interface MediaCardProps {
   item: MediaItem
@@ -20,6 +20,7 @@ export function MediaCard({
   onPreview,
   onToggleSelect,
 }: MediaCardProps) {
+  const theme = useTheme()
   const cover = item.coverUrl || item.url
   const isVideo = item.type === "video"
   const [imgError, setImgError] = useState(false)

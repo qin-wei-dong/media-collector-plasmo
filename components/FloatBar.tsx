@@ -1,6 +1,6 @@
 // components/FloatBar.tsx — 深色重度磨砂浮动操作栏
 // 删除交互改为:点击立即删除 + 底部 Toast「已删除 N 项」+ 5 秒可撤销(P0-4)
-import { theme } from "../popup-theme"
+import { useTheme } from "../lib/use-theme"
 
 interface FloatBarProps {
   selectedCount: number
@@ -19,6 +19,7 @@ export function FloatBar({
   onDelete,
   onToggleSelectAll,
 }: FloatBarProps) {
+  const theme = useTheme()
   const allSelected = totalCount > 0 && selectedCount >= totalCount
   const nothingSelected = selectedCount === 0
 

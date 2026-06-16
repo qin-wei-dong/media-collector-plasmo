@@ -1,78 +1,129 @@
-// popup-theme.ts — Popup 主题 token
-// 圆角/spacing/button 档位对齐 mockups/tokens.css (Apple Liquid Glass);
-// accent 改为 Action Blue;popup 尺寸(460x660)为产品决策,保留。
-// 唯一权威源;禁止在组件里内联 magic value 除非来自此文件。
+// lib/design-tokens.ts — Design tokens 唯一权威源(TS module)
+// 之前在 popup-theme.ts;P3-19 迁移到 lib/ 并加 ThemeTokens 接口 + light/dark 双主题。
+// 组件通过 useTheme() hook 消费,禁止内联 magic value。
 
-export const theme = {
-  // ===== 表面(深色双层) =====
+export interface ThemeTokens {
+  // ===== 表面 =====
+  bg: string
+  bgGradient: string
+  card: string
+  cardHover: string
+  floatBar: string
+
+  // ===== 文字 =====
+  textPrimary: string
+  textSecondary: string
+  textTertiary: string
+
+  // ===== 强调(Apple Action Blue) =====
+  accent: string
+  accentFocus: string
+  accentDark: string
+  accentLight: string
+
+  // ===== 警示 =====
+  danger: string
+  dangerBg: string
+  dangerText: string
+
+  // ===== 平台品牌色 =====
+  xhs: string
+  xhsBg: string
+  douyin: string
+  douyinBg: string
+
+  // ===== 圆角(5 档) =====
+  r: { xs: number; sm: number; md: number; lg: number; pill: number }
+
+  // ===== 8pt 间距 =====
+  sp: { xxs: number; xs: number; sm: number; md: number; lg: number; xl: number; xxl: number }
+
+  // ===== 按钮尺寸(4 档) =====
+  btn: { xs: number; sm: number; md: number; lg: number }
+
+  // ===== 字号(6 档) =====
+  fs: { micro: number; caption: number; body: number; bodyLg: number; title: number; display: number }
+
+  // ===== 磨砂玻璃 =====
+  glass: string
+  glassBlur: string
+  glassBlurStrong: string
+
+  // ===== 阴影 =====
+  shadowCard: string
+  shadowHero: string
+  shadowFloat: string
+
+  // ===== 动效 =====
+  easeSpring: string
+  easeOut: string
+  durFast: string
+  dur: string
+
+  // ===== Focus ring(键盘可达性) =====
+  focusRing: string
+  focusRingOffset: string
+}
+
+/**
+ * Dark theme — 当前主色,Apple Music 沉浸风深色
+ * 所有色值必须与 mockups/tokens.css(若存在)对齐
+ */
+export const darkTheme: ThemeTokens = {
   bg: "#0a0a0c",
   bgGradient: "#1c1c1e",
   card: "rgba(255,255,255,0.08)",
   cardHover: "rgba(255,255,255,0.12)",
   floatBar: "rgba(40,40,42,0.62)",
 
-  // ===== 文字 =====
   textPrimary: "#ffffff",
   textSecondary: "rgba(255,255,255,0.7)",
   textTertiary: "rgba(255,255,255,0.5)",
 
-  // ===== 强调色(Apple Action Blue,与 mockups/tokens.css 对齐) =====
   accent: "#0066cc",
   accentFocus: "#0071e3",
   accentDark: "#2997ff",
-  accentLight: "#5AC8FA", // 用于渐变终点的亮蓝
+  accentLight: "#5AC8FA",
 
-  // ===== 警示(独立于 accent) =====
   danger: "#FF453A",
   dangerBg: "rgba(255,69,58,0.16)",
   dangerText: "#FF453A",
 
-  // ===== 平台品牌色(P1-3):用于 chip / 卡片角标区分平台 =====
-  // 小红书 - 官方红
   xhs: "#FF2442",
   xhsBg: "rgba(255,36,66,0.16)",
-  // 抖音 - 选用 cyan(品牌色为黑/粉,在深色 UI 上辨识度不够,改用更亮的 cyan 与小红书区分)
   douyin: "#25F4EE",
   douyinBg: "rgba(37,244,238,0.16)",
 
-  // ===== 线条 =====
-  hairline: "rgba(255,255,255,0.12)",
-  hairlineSoft: "rgba(255,255,255,0.06)",
-
-  // ===== 圆角(5 档,与 tokens.css 对齐) =====
   r: { xs: 5, sm: 8, md: 11, lg: 18, pill: 9999 },
-
-  // ===== 8pt 间距(与 tokens.css 对齐) =====
   sp: { xxs: 4, xs: 8, sm: 12, md: 17, lg: 24, xl: 32, xxl: 48 },
-
-  // ===== 按钮尺寸(标准 4 档) =====
   btn: { xs: 22, sm: 30, md: 38, lg: 40 },
-
-  // ===== 字号(简化,只列 popup 用到的档) =====
   fs: { micro: 11, caption: 12, body: 14, bodyLg: 15, title: 17, display: 26 },
 
-  // ===== 磨砂玻璃 =====
   glass: "rgba(255,255,255,0.08)",
   glassBlur: "saturate(180%) blur(20px)",
   glassBlurStrong: "saturate(180%) blur(30px)",
 
-  // ===== 阴影 =====
   shadowCard: "0 8px 20px rgba(0,0,0,0.45)",
   shadowHero: "0 16px 36px rgba(0,0,0,0.5)",
   shadowFloat: "0 16px 40px rgba(0,0,0,0.5)",
 
-  // ===== 动效 =====
   easeSpring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
   easeOut: "cubic-bezier(0.16, 1, 0.3, 1)",
   durFast: "180ms",
   dur: "250ms",
 
-  // ===== Focus ring(P0-5):可见焦点 =====
   focusRing: "0 0 0 2px #0066cc",
   focusRingOffset: "0 0 0 2px #0066cc, 0 0 0 4px rgba(0,102,204,0.25)",
-} as const
+}
 
-// 作者头像渐变色板(按 author hash 分配稳定色)
+/**
+ * Light theme — P3-21 完整填充;P3-19 范围先 fall back 到 darkTheme
+ * 留空会让 P3-19 build 通过,但 light 模式实际仍显示 dark(等 P3-21 落地)
+ */
+export const lightTheme: ThemeTokens = darkTheme
+
+// ===== 头像渐变(不依赖主题,放一起便于维护) =====
+
 export const avatarGradients = [
   "linear-gradient(135deg, #FF5A5F, #FF2D55)",
   "linear-gradient(135deg, #5AC8FA, #007AFF)",
@@ -92,6 +143,8 @@ export function getAvatarGradient(name: string): string {
   }
   return avatarGradients[Math.abs(hash) % avatarGradients.length]
 }
+
+// ===== 时间分桶(不依赖主题) =====
 
 /** 时间分组标签 */
 export function getTimeBucket(collectedAt: string): string {

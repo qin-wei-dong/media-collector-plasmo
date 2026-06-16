@@ -1,7 +1,8 @@
 // components/EmptyState.tsx — 三步图示空状态
-import { theme } from "../popup-theme"
+import { useTheme } from "../lib/use-theme"
 
 export function EmptyState() {
+  const theme = useTheme()
   return (
     <div style={styles.empty}>
       <div style={styles.illust}>
@@ -85,6 +86,7 @@ function Step({
   desc: string
   icon: React.ReactNode
 }) {
+  const theme = useTheme()
   return (
     <div style={stylesLocal.step}>
       <div style={{ ...stylesLocal.stepNum, backgroundImage: gradient }}>{icon}</div>

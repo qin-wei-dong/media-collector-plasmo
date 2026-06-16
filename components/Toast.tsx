@@ -1,6 +1,6 @@
 // components/Toast.tsx — 底部 Snackbar(支持 action 按钮 + 自动消失)
 import { useEffect } from "react"
-import { theme } from "../popup-theme"
+import { useTheme } from "../lib/use-theme"
 
 interface ToastProps {
   message: string
@@ -22,6 +22,7 @@ export function Toast({
   progress,
   onDismiss,
 }: ToastProps) {
+  const theme = useTheme()
   // duration 毫秒后自动消失
   useEffect(() => {
     const timer = window.setTimeout(onDismiss, duration)

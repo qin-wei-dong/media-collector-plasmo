@@ -1,7 +1,7 @@
 // components/Hero.tsx — Hero 精选大卡(最新采集的笔记)
 import { useState } from "react"
 import type { MediaItem } from "../types"
-import { theme } from "../popup-theme"
+import { useTheme } from "../lib/use-theme"
 
 interface HeroProps {
   item: MediaItem
@@ -14,6 +14,7 @@ interface HeroProps {
 }
 
 export function Hero({ item, count, onClick, onDownload, onOpenSource }: HeroProps) {
+  const theme = useTheme()
   const cover = item.coverUrl || item.url
   const isVideo = item.type === "video"
   const [imgError, setImgError] = useState(false)

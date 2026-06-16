@@ -1,7 +1,8 @@
 // components/AuthorCarousel.tsx — 圆形作者头像横滑入口
 import { useEffect, useState } from "react"
 import type { MediaItem } from "../types"
-import { theme, getAvatarGradient } from "../popup-theme"
+import { getAvatarGradient } from "../lib/design-tokens"
+import { useTheme } from "../lib/use-theme"
 
 interface AuthorCarouselProps {
   authors: Array<{ name: string; count: number; firstItem: MediaItem }>
@@ -12,6 +13,7 @@ interface AuthorCarouselProps {
 
 /** 单个头像的加载状态管理(避免互相干扰) */
 function AuthorAvatar({ author, isActive }: { author: { name: string; count: number; firstItem: MediaItem }; isActive: boolean }) {
+  const theme = useTheme()
   const [imgLoaded, setImgLoaded] = useState(false)
   const [imgError, setImgError] = useState(false)
   const cover = author.firstItem.coverUrl
@@ -67,6 +69,7 @@ function AuthorAvatar({ author, isActive }: { author: { name: string; count: num
 }
 
 export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible = 5 }: AuthorCarouselProps) {
+  const theme = useTheme()
   const [expanded, setExpanded] = useState(false)
   const [showScrollHint, setShowScrollHint] = useState(true)
   if (!authors.length) return null

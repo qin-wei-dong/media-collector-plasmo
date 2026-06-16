@@ -1,7 +1,8 @@
 // popup.tsx — 素材采集助手弹窗(Apple Music 沉浸风)
 import { useState, useEffect, useCallback, useMemo } from "react"
 import type { MediaItem } from "./types"
-import { theme, getTimeBucket, TIME_ORDER } from "./popup-theme"
+import { getTimeBucket, TIME_ORDER } from "./lib/design-tokens"
+import { ThemeProvider, useTheme } from "./lib/use-theme"
 import { Hero } from "./components/Hero"
 import { AuthorCarousel } from "./components/AuthorCarousel"
 import { FloatBar } from "./components/FloatBar"
@@ -11,12 +12,16 @@ import { PreviewModal } from "./components/PreviewModal"
 import { Toast } from "./components/Toast"
 
 // 注入全局样式:覆盖 Plasmo 默认 body 白底/margin,让 popup 整体深色透明
-function injectPopupStyles() {
+// 接受 theme 参数:P3-21 加 light 主题时,theme 变了会重新注入 focus ring / 颜色
+function injectPopupStyles(theme: import("./lib/design-tokens").ThemeTokens) {
   const id = "__mc_popup_style"
-  if (document.getElementById(id)) return
-  const style = document.createElement("style")
-  style.id = id
-  style.textContent = `
+  let el = document.getElementById(id) as HTMLStyleElement | null
+  if (!el) {
+    el = document.createElement("style")
+    el.id = id
+    document.head.appendChild(el)
+  }
+  el.textContent = `
     html, body { margin:0; padding:0; background:transparent; width:460px; height:100%; overflow:hidden; }
     #__plasmo { height:100%; overflow:hidden; background:transparent; border-radius:20px; }
     @keyframes mc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -40,10 +45,10 @@ function injectPopupStyles() {
     .mc-card-art:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 12px 28px rgba(0,0,0,0.55); }
     .mc-card-art:active { transform: scale(0.97); }
   `
-  document.head.appendChild(style)
 }
 
 function Popup() {
+  const theme = useTheme()
   const [items, setItems] = useState<MediaItem[]>([])
   const [batchDownloading, setBatchDownloading] = useState(false)
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
@@ -56,10 +61,10 @@ function Popup() {
   const [deletedBackup, setDeletedBackup] = useState<MediaItem[] | null>(null)
   const [undoToastVisible, setUndoToastVisible] = useState(false)
 
-  // 注入全局样式(覆盖 Plasmo 默认白底)
+  // 注入全局样式(覆盖 Plasmo 默认白底);主题切换时重新注入
   useEffect(() => {
-    injectPopupStyles()
-  }, [])
+    injectPopupStyles(theme)
+  }, [theme])
 
   // P2-5: 键盘快捷键
   useEffect(() => {
@@ -892,4 +897,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
 }
 
-export default Popup
+export default function PopupWithTheme() {
+  return (
+    <ThemeProvider initial="dark">
+      <Popup />
+    </ThemeProvider>
+  )
+}

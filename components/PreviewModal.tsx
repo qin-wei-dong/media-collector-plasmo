@@ -1,7 +1,7 @@
 // components/PreviewModal.tsx — 全屏大图预览(支持左右切换)
 import { useState, useEffect, useCallback } from "react"
 import type { MediaItem } from "../types"
-import { theme } from "../popup-theme"
+import { useTheme } from "../lib/use-theme"
 
 interface PreviewModalProps {
   item: MediaItem
@@ -11,6 +11,7 @@ interface PreviewModalProps {
 }
 
 export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewModalProps) {
+  const theme = useTheme()
   const [imgLoading, setImgLoading] = useState(true)
   const [imgError, setImgError] = useState(false)
   const currentIndex = siblings.findIndex((i) => i.id === item.id)
