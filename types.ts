@@ -31,9 +31,10 @@ export type MessageType =
   | "COLLECT_NOTE_IMAGES"
   | "GET_ITEMS"
   | "CLEAR_ITEMS"
-  | "DOWNLOAD_ITEM"
   | "BATCH_DOWNLOAD"
   | "GET_LAST_MEDIA"
+  | "INJECT_MAIN_WORLD"
+  | "REMOVE_ITEMS"
 
 export interface MessagePayloads {
   COLLECT_MEDIA: {
@@ -46,6 +47,7 @@ export interface MessagePayloads {
     groupIndex?: number
     width?: number
     height?: number
+    author?: string
   }
   COLLECT_NOTE_IMAGES: {
     noteId: string
@@ -54,15 +56,17 @@ export interface MessagePayloads {
       width?: number
       height?: number
       groupIndex: number
+      coverUrl?: string
     }>
     title: string
     sourceUrl: string
+    author?: string
   }
   GET_ITEMS: void
   CLEAR_ITEMS: void
-  DOWNLOAD_ITEM: { url: string; filename: string }
-  BATCH_DOWNLOAD: Array<{ url: string; filename: string }>
+  BATCH_DOWNLOAD: Array<{ url: string; filename: string; platform?: Platform }>
   GET_LAST_MEDIA: void
+  REMOVE_ITEMS: string[]
 }
 
 export interface MessageResponse {
@@ -83,6 +87,7 @@ export interface MessageResponse {
 }
 
 export const STORAGE_KEY = "collected_media"
+export const MEDIA_COLLECTOR_DIR = "media-collector"
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   xiaohongshu: "小红书",

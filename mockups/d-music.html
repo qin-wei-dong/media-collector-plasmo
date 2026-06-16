@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=400">
+<title>设计 D · Apple Music 沉浸风 (定稿)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+    background: #0a0a0c;
+    color: #fff;
+    width: 380px;
+    height: 600px;
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+    overflow: hidden;
+    position: relative;
+  }
+  /* 氛围色:从最新采集封面渗入(Apple Music 招牌) */
+  .ambient {
+    position: fixed; inset: 0; z-index: 0;
+    background:
+      radial-gradient(ellipse 70% 45% at 30% 0%, rgba(255,90,95,0.22), transparent 60%),
+      radial-gradient(ellipse 65% 55% at 85% 25%, rgba(120,80,255,0.18), transparent 55%),
+      linear-gradient(180deg, #0a0a0c 0%, #1c1c1e 100%);
+  }
+  .content { position: relative; z-index: 1; display:flex; flex-direction:column; height:100%; }
+
+  /* ===== 顶栏 ===== */
+  .navbar {
+    flex-shrink: 0;
+    padding: 16px 20px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .largetitle {
+    font-size: 30px; font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .count-badge {
+    font-size: 12px; font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    background: rgba(255,255,255,0.1);
+    padding: 3px 9px; border-radius: 10px;
+    margin-left: 8px; vertical-align: middle;
+  }
+  .tools { display: flex; gap: 6px; }
+  .tool {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(12px);
+    transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .tool:active { transform: scale(0.92); }
+  .tool svg { width: 15px; height: 15px; }
+  .tool.active { background: #fff; color: #000; }
+
+  /* ===== Hero 精选大卡 ===== */
+  .hero-wrap { padding: 0 20px 16px; }
+  .hero {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    aspect-ratio: 16/10;
+    background-size: cover; background-position: center;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.5);
+    cursor: pointer;
+  }
+  .hero-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.15) 55%, transparent 100%);
+  }
+  .hero-info { position: absolute; left: 16px; right: 16px; bottom: 14px; }
+  .hero-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.4px; text-transform: uppercase;
+    color: #fff;
+    background: rgba(255,255,255,0.2);
+    backdrop-filter: blur(10px);
+    padding: 3px 8px; border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .hero-tag::before { content:""; width:5px; height:5px; border-radius:50%; background:#FF453A; }
+  .hero-title {
+    font-size: 19px; font-weight: 700;
+    letter-spacing: -0.3px;
+    margin-bottom: 3px;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .hero-meta { font-size: 13px; color: rgba(255,255,255,0.75); }
+  .hero-actions {
+    position: absolute; top: 14px; right: 14px;
+    display: flex; gap: 6px;
+  }
+  .hero-btn {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(0,0,0,0.4);
+    backdrop-filter: blur(12px);
+    border: none; color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hero-btn svg { width: 14px; height: 14px; }
+
+  /* ===== 滚动区 ===== */
+  .scroll-area { flex: 1; overflow-y: auto; padding-bottom: 88px; }
+  .scroll-area::-webkit-scrollbar { display: none; }
+
+  .section { padding: 2px 0 18px; }
+  .section-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 0 20px 10px;
+  }
+  .section-title {
+    font-size: 19px; font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+  .section-more {
+    font-size: 13px; color: rgba(255,255,255,0.5);
+    font-weight: 500; cursor: pointer;
+  }
+
+  .carousel {
+    display: flex; gap: 11px;
+    overflow-x: auto;
+    padding: 0 20px 4px;
+    scroll-snap-type: x mandatory;
+  }
+  .carousel::-webkit-scrollbar { display: none; }
+
+  /* 封面卡片 */
+  .card { flex: 0 0 auto; width: 128px; scroll-snap-align: start; cursor: pointer; position: relative; }
+  .card-art {
+    width: 128px; height: 128px;
+    border-radius: 10px;
+    background-size: cover; background-position: center;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.45);
+    position: relative; overflow: hidden;
+    transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .card:hover .card-art { transform: scale(1.04); }
+  .card.selected .card-art { box-shadow: 0 0 0 3px #fff, 0 8px 20px rgba(0,0,0,0.45); }
+  .card-art.video::after {
+    content: ""; position: absolute; bottom: 0; right: 0;
+    width: 0; height: 0;
+    border-left: 18px solid transparent;
+    border-bottom: 18px solid rgba(255,255,255,0.92);
+  }
+  .card-art.multi::before {
+    content: attr(data-count);
+    position: absolute; top: 7px; right: 7px;
+    font-size: 11px; font-weight: 700;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    color: #fff;
+    padding: 2px 7px; border-radius: 6px;
+  }
+  .card-check {
+    position: absolute; top: 7px; left: 7px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: #fff; color: #000;
+    display: none; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .card.selected .card-check { display: flex; }
+  .card-title {
+    font-size: 13px; font-weight: 600;
+    margin-top: 9px; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    letter-spacing: -0.1px;
+  }
+  .card-meta {
+    font-size: 12px; color: rgba(255,255,255,0.5);
+    margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* 圆形作者头像 */
+  .avatar-card { flex: 0 0 auto; width: 74px; text-align: center; scroll-snap-align: start; cursor: pointer; }
+  .avatar-art {
+    width: 74px; height: 74px; border-radius: 50%;
+    margin: 0 auto;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+    position: relative;
+  }
+  .avatar-art::after {
+    content: attr(data-count);
+    position: absolute; bottom: -2px; right: -2px;
+    font-size: 10px; font-weight: 700;
+    background: #fff; color: #000;
+    padding: 1px 6px; border-radius: 8px;
+    border: 2px solid #1c1c1e;
+  }
+  .avatar-name {
+    font-size: 12px; color: rgba(255,255,255,0.85);
+    margin-top: 8px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ===== 浮动玻璃操作栏 ===== */
+  .actionbar {
+    position: absolute; bottom: 14px; left: 14px; right: 14px;
+    background: rgba(40,40,42,0.62);
+    backdrop-filter: saturate(180%) blur(30px);
+    -webkit-backdrop-filter: saturate(180%) blur(30px);
+    border: 0.5px solid rgba(255,255,255,0.12);
+    border-radius: 22px;
+    padding: 8px;
+    display: flex; align-items: center; gap: 4px;
+    z-index: 10;
+    box-shadow: 0 16px 40px rgba(0,0,0,0.5);
+  }
+  .sel-pill { display: flex; align-items: center; gap: 9px; padding: 0 12px; flex: 1; }
+  .sel-circle {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: #fff; color: #000;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .sel-text { font-size: 14px; color: rgba(255,255,255,0.85); }
+  .act-icon {
+    width: 38px; height: 38px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,0.12);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: #fff;
+    transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .act-icon:active { transform: scale(0.9); }
+  .act-icon svg { width: 18px; height: 18px; }
+  .act-icon.danger { background: rgba(255,69,58,0.25); }
+
+  /* ===== 空状态 (三步图示) ===== */
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; text-align: center; }
+  .empty-title { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 8px; }
+  .empty-sub { font-size: 14px; color: rgba(255,255,255,0.55); margin-bottom: 32px; line-height: 1.5; }
+  .steps { width: 100%; display: flex; flex-direction: column; gap: 18px; }
+  .step { display: flex; align-items: center; gap: 16px; text-align: left; }
+  .step-num {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: rgba(255,255,255,0.9);
+  }
+  .step-num svg { width: 22px; height: 22px; }
+  .step-text { flex: 1; }
+  .step-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .step-desc { font-size: 13px; color: rgba(255,255,255,0.5); line-height: 1.4; }
+  .step-badge {
+    font-size: 11px; font-weight: 700; color: rgba(255,255,255,0.4);
+    width: 22px; text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<div class="content">
+
+  <div class="navbar">
+    <div>
+      <span class="largetitle">素材</span>
+      <span class="count-badge">124</span>
+    </div>
+    <div class="tools">
+      <div class="tool" title="搜索">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+      <div class="tool active" title="选择">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hero 精选 -->
+  <div class="hero-wrap">
+    <div class="hero" style="background-image:url(https://picsum.photos/seed/herofinal/600)">
+      <div class="hero-overlay"></div>
+      <div class="hero-actions">
+        <button class="hero-btn" title="收藏"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>
+      </div>
+      <div class="hero-info">
+        <span class="hero-tag">最近采集</span>
+        <div class="hero-title">城市夜景 · 扫街合集</div>
+        <div class="hero-meta">老王摄影 · 9 张 · 小红书</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="scroll-area">
+
+    <!-- 作者入口 -->
+    <div class="section">
+      <div class="section-head"><div class="section-title">作者</div><div class="section-more">查看全部</div></div>
+      <div class="carousel">
+        <div class="avatar-card"><div class="avatar-art" data-count="23" style="background:linear-gradient(135deg,#FF5A5F,#FF2D55)"></div><div class="avatar-name">老王摄影</div></div>
+        <div class="avatar-card"><div class="avatar-art" data-count="18" style="background:linear-gradient(135deg,#5AC8FA,#007AFF)"></div><div class="avatar-name">美食日记</div></div>
+        <div class="avatar-card"><div class="avatar-art" data-count="41" style="background:linear-gradient(135deg,#AF52DE,#5856D6)"></div><div class="avatar-name">设计灵感</div></div>
+        <div class="avatar-card"><div class="avatar-art" data-count="12" style="background:linear-gradient(135deg,#FFD60A,#FF9500)"></div><div class="avatar-name">旅行手记</div></div>
+      </div>
+    </div>
+
+    <!-- 今天 -->
+    <div class="section">
+      <div class="section-head"><div class="section-title">今天</div><div class="section-more">6 张</div></div>
+      <div class="carousel">
+        <div class="card selected">
+          <div class="card-art multi" data-count="9" style="background-image:url(https://picsum.photos/seed/t1/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">城市夜景</div><div class="card-meta">老王摄影</div>
+        </div>
+        <div class="card selected">
+          <div class="card-art video" style="background-image:url(https://picsum.photos/seed/t2/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">brunch 探店</div><div class="card-meta">美食日记</div>
+        </div>
+        <div class="card">
+          <div class="card-art multi" data-count="6" style="background-image:url(https://picsum.photos/seed/t3/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">咖啡店光线</div><div class="card-meta">老王摄影</div>
+        </div>
+        <div class="card">
+          <div class="card-art" style="background-image:url(https://picsum.photos/seed/t4/300)"><div class="card-check">✓</div></div>
+          <div="card-title">极简海报</div><div class="card-meta">设计灵感</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 昨天 -->
+    <div class="section">
+      <div class="section-head"><div class="section-title">昨天</div><div class="section-more">9 张</div></div>
+      <div class="carousel">
+        <div class="card">
+          <div class="card-art multi" data-count="12" style="background-image:url(https://picsum.photos/seed/y1/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">秋日街拍</div><div class="card-meta">老王摄影</div>
+        </div>
+        <div class="card">
+          <div class="card-art" style="background-image:url(https://picsum.photos/seed/y2/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">UI 配色</div><div class="card-meta">设计灵感</div>
+        </div>
+        <div class="card">
+          <div class="card-art video" style="background-image:url(https://picsum.photos/seed/y3/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">日落延时</div><div class="card-meta">旅行手记</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 本周 -->
+    <div class="section">
+      <div class="section-head"><div class="section-title">本周</div><div class="section-more">12 张</div></div>
+      <div class="carousel">
+        <div class="card">
+          <div class="card-art multi" data-count="8" style="background-image:url(https://picsum.photos/seed/w1/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">美食九宫格</div><div class="card-meta">美食日记</div>
+        </div>
+        <div class="card">
+          <div class="card-art" style="background-image:url(https://picsum.photos/seed/w2/300)"><div class="card-check">✓</div></div>
+          <div class="card-title">海报字体</div><div class="card-meta">设计灵感</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="actionbar">
+    <div class="sel-pill">
+      <div class="sel-circle">2</div>
+      <div class="sel-text">已选 2 项</div>
+    </div>
+    <button class="act-icon" title="下载"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
+    <button class="act-icon" title="分享"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+    <button class="act-icon danger" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+  </div>
+
+</div>
+
+</body>
+</html>

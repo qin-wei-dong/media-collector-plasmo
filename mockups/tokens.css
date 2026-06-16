@@ -1,0 +1,114 @@
+/* ============================================================
+   Apple Liquid Glass Design Tokens (2026)
+   严格来自 Apple 官网逆向 DESIGN.md + WWDC25 Liquid Glass。
+   这是唯一权威源,禁止内联 hex 除非来自此文件。
+   ============================================================ */
+
+:root {
+  /* ===== 强调色(唯一 Action Blue) ===== */
+  --ac-blue:        #0066cc;
+  --ac-blue-focus:  #0071e3;
+  --ac-blue-dark:   #2997ff;
+
+  /* ===== 表面(明) ===== */
+  --canvas:         #ffffff;
+  --parchment:      #f5f5f7;
+  --pearl:          #fafafc;
+
+  /* ===== 表面(暗) ===== */
+  --tile-1:         #272729;
+  --tile-2:         #2a2a2c;
+  --tile-3:         #252527;
+  --void:           #000000;
+
+  /* ===== 文字 ===== */
+  --ink:            #1d1d1f;
+  --ink-80:         #333333;
+  --ink-48:         #7a7a7a;
+  --on-dark:        #ffffff;
+  --on-dark-muted:  #cccccc;
+
+  /* ===== 线条 ===== */
+  --divider-soft:   rgba(0,0,0,0.04);
+  --hairline:       #e0e0e0;
+  --chip-glass:     rgba(210,210,215,0.64);
+
+  /* ===== 字体 ===== */
+  --font-display: "SF Pro Display, system-ui, -apple-system, sans-serif";
+  --font-text:    "SF Pro Text, system-ui, -apple-system, sans-serif";
+
+  /* ===== 8pt 间距 ===== */
+  --sp-xxs: 4px;
+  --sp-xs:  8px;
+  --sp-sm:  12px;
+  --sp-md:  17px;
+  --sp-lg:  24px;
+  --sp-xl:  32px;
+  --sp-xxl: 48px;
+  --sp-section: 80px;
+
+  /* ===== 圆角(只有四档 + pill) ===== */
+  --r-none: 0;
+  --r-xs:   5px;
+  --r-sm:   8px;
+  --r-md:   11px;
+  --r-lg:   18px;
+  --r-pill: 9999px;
+
+  /* ===== 投影(仅产品图) ===== */
+  --sh-product:  rgba(0,0,0,0.22) 3px 5px 30px 0;
+  --ring-hairline: 0 0 0 1px rgba(0,0,0,0.08);
+
+  /* ===== 动效 ===== */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast:    180ms;
+}
+
+/* ===== Base ===== */
+* { margin:0; padding:0; box-sizing:border-box; -webkit-font-smoothing:antialiased; }
+
+body {
+  font-family: var(--font-text);
+  color: var(--ink);
+  width: 380px;
+  height: 600px;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  overflow: hidden;
+  background: var(--parchment);  /* Apple 标志性暖白,默认画布 */
+  font-size: 17px;               /* 正文 17px,不是 16 */
+  line-height: 1.47;
+  letter-spacing: -0.374px;
+}
+
+::-webkit-scrollbar { width: 0; height: 0; }
+
+/* ===== Liquid Glass 材质(WWDC25) ===== */
+.liquid-glass {
+  background: rgba(255,255,255,0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 0.5px solid rgba(255,255,255,0.18);
+}
+.liquid-glass-dark {
+  background: rgba(28,28,30,0.72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  border: 0.5px solid rgba(255,255,255,0.10);
+}
+
+/* ===== 字号工具类(严格 Apple Type Scale) ===== */
+.ts-hero       { font-family:var(--font-display); font-size:56px;  font-weight:600; line-height:1.07; letter-spacing:-0.28px; }
+.ts-display-lg { font-family:var(--font-display); font-size:40px;  font-weight:600; line-height:1.10; letter-spacing:0; }
+.ts-display-md { font-family:var(--font-display); font-size:34px;  font-weight:600; line-height:1.47; letter-spacing:-0.374px; }
+.ts-lead       { font-family:var(--font-display); font-size:28px;  font-weight:400; line-height:1.14; letter-spacing:0.196px; }
+.ts-tagline    { font-family:var(--font-display); font-size:21px;  font-weight:600; line-height:1.19; letter-spacing:0.231px; }
+.ts-body-strong{ font-family:var(--font-text);    font-size:17px;  font-weight:600; line-height:1.24; letter-spacing:-0.374px; }
+.ts-body       { font-family:var(--font-text);    font-size:17px;  font-weight:400; line-height:1.47; letter-spacing:-0.374px; }
+.ts-caption    { font-family:var(--font-text);    font-size:14px;  font-weight:400; line-height:1.43; letter-spacing:-0.224px; }
+.ts-caption-strong { font-family:var(--font-text); font-size:14px; font-weight:600; line-height:1.29; letter-spacing:-0.224px; }
+.ts-fine       { font-family:var(--font-text);    font-size:12px;  font-weight:400; line-height:1.0; letter-spacing:-0.12px; }
+.ts-micro      { font-family:var(--font-text);    font-size:10px;  font-weight:400; line-height:1.3; letter-spacing:-0.08px; }
+.ts-nav        { font-family:var(--font-text);    font-size:12px;  font-weight:400; line-height:1.0; letter-spacing:-0.12px; }

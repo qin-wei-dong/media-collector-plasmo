@@ -96,3 +96,22 @@ export function removeItem(id: string): Promise<void> {
     })
   )
 }
+
+export function removeItems(ids: string[]): Promise<void> {
+  if (!ids.length) return Promise.resolve()
+  const idSet = new Set(ids)
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getItems().then((items) => {
+        const filtered = items.filter((i) => !idSet.has(i.id))
+        chrome.storage.local.set({ [STORAGE_KEY]: filtered }, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+            return
+          }
+          resolve()
+        })
+      }).catch(reject)
+    })
+  )
+}

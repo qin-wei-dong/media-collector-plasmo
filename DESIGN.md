@@ -1,6 +1,6 @@
 # 素材采集助手 v2.0 — 扩展设计文档
 
-> 状态：草稿 | 日期：2026-06-10
+> 状态：进行中（Phase 1/3/4 已完成） | 日期：2026-06-10 | 更新：2026-06-11
 
 ---
 
@@ -114,19 +114,22 @@ function extractXHSNoteImages(): ImageData[] {
 ```
 media-collector-plasmo/
 ├── contents/                    ← 拆分为多平台
-│   ├── base.ts                  ← 共享：悬停检测、按钮渲染、Toast
-│   ├── xiaohongshu.ts           ← 小红书：单图 + 多图提取
-│   ├── douyin.ts                ← 抖音：无水印视频提取
+│   ├── xiaohongshu.ts           ← 小红书：单图 + 多图提取（ISOLATED world）
+│   ├── xiaohongshu-state.ts     ← 小红书：拦截 __INITIAL_STATE__（MAIN world）
+│   └── douyin.ts                ← 抖音：视频采集
 ├── background/
-│   ├── index.ts                 ← 消息路由
-│   ├── storage.ts               ← 存储逻辑
-│   ├── download.ts              ← 单条/批量下载
-
-├── popup.tsx                    ← UI 组件
-├── components/                  ← 可复用 UI 组件
-│   ├── MediaCard.tsx
-│   ├── BatchBar.tsx
-│   └── PlatformFilter.tsx
+│   ├── index.ts                 ← 消息路由 + 安装初始化
+│   ├── storage.ts               ← 存储 CRUD（带写锁）
+│   └── download.ts              ← 单条/批量下载
+├── lib/
+│   └── base.ts                  ← 共享：悬停检测、按钮渲染、Toast
+├── components/
+│   ├── MediaCard.tsx            ← 素材卡片
+│   ├── BatchBar.tsx             ← 批量操作栏
+│   ├── PlatformFilter.tsx       ← 平台筛选
+│   └── NoteGroup.tsx            ← 笔记分组折叠
+├── popup.tsx                    ← 弹窗主组件
+├── types.ts                     ← 共享类型定义
 └── assets/
 ```
 
@@ -192,20 +195,33 @@ type MessageType =
 
 ## 五、实施路线图
 
-### Phase 1：架构重构（1天）
+### Phase 1：架构重构（1天） ✅ 已完成
 
-- [ ] 拆分 `content.ts` 为 `contents/base.ts` + `contents/xiaohongshu.ts` + `contents/douyin.ts`
-- [ ] 拆分 `background.ts` 为 `background/index.ts` + `background/storage.ts` + `background/download.ts`
-- [ ] 抽象共享 UI 组件（`MediaCard`、`BatchBar`）
-- [ ] 验证 v1.0 功能不受影响
+- [x] 拆分 `content.ts` 为 `contents/xiaohongshu.ts` + `contents/xiaohongshu-state.ts` + `contents/douyin.ts`
+- [x] 拆分 `background.ts` 为 `background/index.ts` + `background/storage.ts` + `background/download.ts`
+- [x] 抽象共享 UI 组件（`MediaCard`、`BatchBar`、`PlatformFilter`、`NoteGroup`）
+- [x] 验证 v1.0 功能不受影响
 
-### Phase 2：小红书多图（1天）
+### Phase 2：抖音无水印下载（1.5天） ⏳ 待实现
 
-- [ ] 实现笔记详情页检测
-- [ ] 解析 `window.__INITIAL_STATE__` 获取全部图片
-- [ ] 新增「采集本笔记全部图片(N张)」按钮
-- [ ] 弹窗中按笔记分组显示（可折叠）
-- [ ] 批量下载时自动命名（标题_序号.jpg）
+- [ ] 分析抖音视频 URL 结构
+- [ ] 实现无水印 URL 解析
+- [ ] 批量下载用户视频功能
+
+### Phase 3：小红书多图（1天） ✅ 已完成
+
+- [x] 实现笔记详情页检测
+- [x] 解析 `window.__INITIAL_STATE__` 获取全部图片
+- [x] DOM 提取 + state 提取双路径兜底
+- [x] 新增「采集本笔记全部图片(N张)」选择弹窗
+- [x] 弹窗中按笔记分组显示（可折叠）
+- [x] 批量下载时自动命名（标题_序号.jpg）
+
+### Phase 4：弹窗增强（0.5天） ✅ 已完成
+
+- [x] 平台筛选组件（全部/小红书/抖音）
+- [x] 笔记分组折叠视图
+- [x] 批量操作栏（全选/已选计数/批量下载）
 
 ---
 
@@ -248,9 +264,28 @@ type MessageType =
 
 ## 九、更新路线图
 
-| Phase | 内容 | 估时 |
-|-------|------|------|
-| 1 | 架构重构（拆分 content / background / components） | 1天 |
-| 2 | 抖音批量下载用户全部视频 + 无水印解析 | 1.5天 |
-| 3 | 小红书多图提取 + 笔记分组显示 | 1天 |
-| 4 | 弹窗增强（平台筛选、进度条、分组视图） | 0.5天 |
+| Phase | 内容 | 估时 | 状态 |
+|-------|------|------|------|
+| 1 | 架构重构（拆分 content / background / components） | 1天 | ✅ 已完成 |
+| 2 | 抖音无水印下载 + 批量下载 | 1.5天 | ⏸️ 暂缓（详见下文） |
+| 3 | 小红书多图提取 + 笔记分组显示 | 1天 | ✅ 已完成 |
+| 4 | 弹窗增强（平台筛选、进度条、分组视图） | 0.5天 | ✅ 已完成 |
+
+### Phase 2 暂缓说明
+
+**原计划**：通过 hover 检测抖音视频笔记，解析无水印视频 URL，批量下载。
+
+**现状**：Phase 2 暂缓，详见 [AGENTS.md](./AGENTS.md) "⚠️ Architectural constraint: video collection" 一节。简述：小红书和抖音的视频元数据（`video.media.stream`）只在用户进入笔记详情页后才注入 `window.__INITIAL_STATE__`，列表页 hover 拿不到。所有尝试从列表页主动预取视频 URL 的方案（CSP 拦截、`chrome.scripting.executeScript`、API 调用）都被 XHS 反爬系统拦截（HTTP 500，签名校验失败）。
+
+**当前方案**：列表页 hover 视频笔记降级为采集封面图；用户必须先进入详情页让 state 加载视频元数据，之后回到列表页 hover 同一笔记走缓存命中路径，按视频采集。
+
+**后续方向**（待定）：
+- 监控 XHS 公开 API 的反爬策略变化（不太可能）
+- 调研第三方无水印解析服务（合规风险高）
+- 接受限制，重点优化图片采集链路和批量下载体验
+
+### Phase 1-4 实施备注
+
+- Phase 1 完成后 `DESIGN.md` 描述的 `content.ts` / `background.ts` 单文件结构已不存在，改为按平台拆分的 `contents/` 三文件 + `background/` 三模块
+- Phase 4 的"分组视图"实际实现为 **作者 → 笔记 → 图片卡片** 三层折叠（`AuthorGroup` 嵌入 `NoteGroup` 嵌入 `MediaCard`），不是单层笔记分组
+- `NoteGroup` 设计之初考虑为 popup 顶层独立组件，但实际更适合做嵌入式二级折叠（`embedded` 模式）

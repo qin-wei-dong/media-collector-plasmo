@@ -30,7 +30,8 @@
       "activeTab",
       "scripting",
       "contextMenus",
-      "notifications"
+      "notifications",
+      "tabs"
     ],
     "commands": {
       "collect_media": {

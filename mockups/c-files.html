@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=400">
+<title>设计 C · Apple Files 风 (Liquid Glass)</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  /* ===== 顶栏 ===== */
+  .navbar {
+    flex-shrink: 0;
+    background: rgba(245,245,247,0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    padding: var(--sp-xs) var(--sp-lg) var(--sp-sm);
+  }
+  .nav-row { display: flex; align-items: center; justify-content: space-between; height: 32px; }
+  .largetitle {
+    font-family: var(--font-display);
+    font-size: 34px; font-weight: 600;
+    line-height: 1.47; letter-spacing: -0.374px;
+  }
+  .nav-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+    color: var(--ac-blue);
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .nav-icon:hover { background: var(--divider-soft); }
+  .nav-icon svg { width: 17px; height: 17px; }
+
+  /* ===== 智能筛选卡 (hairline, 无阴影) ===== */
+  .smart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-sm); padding: var(--sp-sm) var(--sp-lg) var(--sp-xs); }
+  .smart-card {
+    background: var(--canvas);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg);
+    padding: var(--sp-md);
+    cursor: pointer;
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .smart-card:active { transform: scale(0.95); }
+  .smart-icon {
+    width: 32px; height: 32px; border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: var(--sp-sm);
+  }
+  .smart-icon svg { width: 18px; height: 18px; color: #fff; }
+  .smart-icon.red { background: #FF3B30; }
+  .smart-icon.dark { background: var(--ink); }
+  .smart-icon.blue { background: var(--ac-blue); }
+  .smart-icon.gray { background: var(--ink-48); }
+  .smart-label {
+    font-family: var(--font-text);
+    font-size: 15px; font-weight: 600; margin-bottom: 2px; letter-spacing: -0.2px;
+  }
+  .smart-count {
+    font-family: var(--font-text);
+    font-size: 13px; color: var(--ink-48);
+  }
+
+  /* ===== 列表 (Inset Grouped) ===== */
+  .list { flex: 1; overflow-y: auto; padding: var(--sp-sm) var(--sp-lg) var(--sp-lg); }
+
+  .sec-label {
+    font-family: var(--font-text);
+    font-size: 13px; font-weight: 400;
+    color: var(--ink-48);
+    text-transform: uppercase; letter-spacing: 0.4px;
+    padding: var(--sp-lg) var(--sp-xs) var(--sp-xs);
+  }
+
+  /* Inset Group: hairline, 无阴影, 0.5px inset separator */
+  .group {
+    background: var(--canvas);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg);
+    overflow: hidden; margin-bottom: var(--sp-xl);
+  }
+  .item {
+    display: flex; align-items: center; gap: var(--sp-md);
+    padding: var(--sp-xs) var(--sp-md);
+    cursor: pointer;
+    min-height: 44px;
+    position: relative;
+    transition: background var(--dur-fast);
+  }
+  .item:not(:last-child)::after {
+    content: ""; position: absolute; left: 56px; right: 0; bottom: 0;
+    height: 0.5px; background: var(--divider-soft);
+  }
+  .item:hover { background: var(--divider-soft); }
+  .item-icon {
+    width: 30px; height: 30px; border-radius: var(--r-sm); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .item-info { flex: 1; min-width: 0; }
+  .item-name {
+    font-family: var(--font-text);
+    font-size: 17px; font-weight: 400;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .item-meta {
+    font-family: var(--font-text);
+    font-size: 13px; color: var(--ink-48); margin-top: 1px;
+  }
+  .chevron { color: var(--ink-48); flex-shrink: 0; opacity: 0.6; }
+  .chevron svg { width: 13px; height: 13px; }
+  .item-count {
+    font-family: var(--font-text);
+    font-size: 17px; color: var(--ink-48); margin-right: 2px; font-weight: 400;
+  }
+</style>
+</head>
+<body>
+
+<div class="navbar">
+  <div class="nav-row">
+    <div class="largetitle">素材</div>
+    <div class="nav-icon" title="搜索">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    </div>
+  </div>
+</div>
+
+<div class="smart-grid">
+  <div class="smart-card">
+    <div class="smart-icon red"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg></div>
+    <div class="smart-label">小红书</div>
+    <div class="smart-count">87 个素材</div>
+  </div>
+  <div class="smart-card">
+    <div class="smart-icon dark"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg></div>
+    <div class="smart-label">抖音</div>
+    <div class="smart-count">37 个素材</div>
+  </div>
+  <div class="smart-card">
+    <div class="smart-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div>
+    <div class="smart-label">图片</div>
+    <div class="smart-count">112 张</div>
+  </div>
+  <div class="smart-card">
+    <div class="smart-icon gray"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg></div>
+    <div class="smart-label">视频</div>
+    <div class="smart-count">12 个</div>
+  </div>
+</div>
+
+<div class="list">
+
+  <div class="sec-label">按作者</div>
+  <div class="group">
+    <div class="item">
+      <div class="item-icon" style="background:linear-gradient(135deg,#FF9500,#FF6B00)"></div>
+      <div class="item-info"><div class="item-name">老王摄影</div><div class="item-meta">5 篇笔记 · 今天</div></div>
+      <div class="item-count">23</div>
+      <div class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="item">
+      <div class="item-icon" style="background:linear-gradient(135deg,#5AC8FA,#007AFF)"></div>
+      <div class="item-info"><div class="item-name">美食日记</div><div class="item-meta">3 篇笔记 · 昨天</div></div>
+      <div class="item-count">18</div>
+      <div class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="item">
+      <div class="item-icon" style="background:linear-gradient(135deg,#5856D6,#AF52DE)"></div>
+      <div class="item-info"><div class="item-name">设计灵感库</div><div class="item-meta">8 篇笔记 · 3 天前</div></div>
+      <div class="item-count">41</div>
+      <div class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+  </div>
+
+  <div class="sec-label">收藏</div>
+  <div class="group">
+    <div class="item">
+      <div class="item-icon" style="background:#FF9500"><svg viewBox="0 0 24 24" fill="#fff"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+      <div class="item-info"><div class="item-name">已收藏</div><div class="item-meta">跨作者精选</div></div>
+      <div class="item-count">8</div>
+      <div class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="item">
+      <div class="item-icon" style="background:#34C759"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <div class="item-info"><div class="item-name">最近下载</div><div class="item-meta">过去 7 天</div></div>
+      <div class="item-count">15</div>
+      <div class="chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

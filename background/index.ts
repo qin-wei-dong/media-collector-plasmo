@@ -1,16 +1,33 @@
 // background/index.ts — 消息路由 + 安装初始化
-import { type MediaItem, STORAGE_KEY } from "../types"
-import { getItems, saveItem, saveItems, clearItems } from "./storage"
-import { downloadSingle, batchDownload } from "./download"
+import { type MediaItem, type MessageType, type MessagePayloads, STORAGE_KEY } from "../types"
+import { getItems, saveItem, saveItems, clearItems, removeItems } from "./storage"
+import { batchDownload } from "./download"
+import { stateInjector } from "../lib/xhs-state-inject"
+
+/** COLLECT_MEDIA 入参 */
+type CollectPayload = MessagePayloads["COLLECT_MEDIA"]
+/** COLLECT_NOTE_IMAGES 入参 */
+type CollectNotePayload = MessagePayloads["COLLECT_NOTE_IMAGES"]
 
 // ====== 工具函数（模块内共享） ======
+// 从 manifest 动态获取扩展图标，避免硬编码 hash
+function getIconUrl(): string {
+  const icons = chrome.runtime.getManifest().icons as Record<string, string> | undefined
+  if (!icons) return ""
+  const key = icons["48"] ? "48" : Object.keys(icons)[0]
+  return chrome.runtime.getURL(icons[key])
+}
+
 export function showNote(title: string, msg: string) {
-  chrome.notifications.create({
-    type: "basic",
-    iconUrl: "icon.png",
-    title,
-    message: msg,
-  })
+  chrome.notifications.create(
+    {
+      type: "basic",
+      iconUrl: getIconUrl(),
+      title,
+      message: msg,
+    },
+    () => void chrome.runtime.lastError
+  )
 }
 
 function getPlatform(url?: string): string {
@@ -25,9 +42,9 @@ function generateId(): string {
 }
 
 // ====== 安装 ======
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("素材采集助手已安装")
+console.log("[BG] service worker 启动")
 
+chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(STORAGE_KEY, (result) => {
     if (!result[STORAGE_KEY]) {
       chrome.storage.local.set({ [STORAGE_KEY]: [] })
@@ -67,22 +84,26 @@ chrome.commands.onCommand.addListener((command) => {
       if (response?.media) {
         collectAndNotify(response.media)
       } else {
-        showNote("未检测到素材", "请先将鼠标悬停在图片/视频上")
+        showNote("未检测到素材", "小红书：请点击笔记弹出浮层后，点击「采集素材」按钮；抖音：请将鼠标悬停在视频上")
       }
     })
   })
 })
 
 // ====== 消息处理 ======
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: any }, _sender, sendResponse) => {
   switch (message.type) {
-    case "COLLECT_MEDIA":
-      collectAndNotify(message.payload, (result) => sendResponse(result))
+    case "COLLECT_MEDIA": {
+      const payload = message.payload as CollectPayload
+      collectAndNotify(payload, (result) => {
+        sendResponse(result)
+      })
       return true
+    }
 
     case "COLLECT_NOTE_IMAGES": {
-      const { noteId, images, title, sourceUrl } = message.payload
-      const newItems: MediaItem[] = images.map((img: any, i: number) => ({
+      const { noteId, images, title, sourceUrl, author } = message.payload as CollectNotePayload
+      const newItems: MediaItem[] = images.map((img, i) => ({
         id: generateId(),
         url: img.url,
         type: "image" as const,
@@ -94,12 +115,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         groupIndex: img.groupIndex ?? i,
         width: img.width,
         height: img.height,
+        author: author || undefined,
+        coverUrl: img.coverUrl || img.url, // 首图作为封面,缺省回退自身 url
       }))
       saveItems(newItems).then((result) => {
         if (result.success) {
           showNote("✅ 笔记采集完成", `已采集 ${images.length} 张图片`)
         }
         sendResponse(result)
+      }).catch((err) => {
+        sendResponse({ success: false, error: String(err) })
       })
       return true
     }
@@ -108,22 +133,45 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       getItems().then((items) => sendResponse({ success: true, items }))
       return true
 
+    case "INJECT_MAIN_WORLD": {
+      // content script 请求注入 MAIN world 拦截器(绕过页面 CSP)
+      // _sender.tab 由浏览器提供,标识消息来源的 tab
+      if (_sender.tab?.id != null) {
+        chrome.scripting
+          .executeScript({
+            target: { tabId: _sender.tab.id, allFrames: false },
+            world: "MAIN",
+            func: stateInjector,
+            injectImmediately: true,
+          })
+          .then((res) => {
+            console.log("[BG] MAIN world 注入成功", res?.[0] ? "Y" : "empty")
+            sendResponse({ success: true })
+          })
+          .catch((e) => sendResponse({ success: false, error: String(e) }))
+      } else {
+        sendResponse({ success: false, error: "no tab" })
+      }
+      return true
+    }
+
     case "CLEAR_ITEMS":
       clearItems().then(() => sendResponse({ success: true }))
       return true
 
-    case "DOWNLOAD_ITEM":
-      downloadSingle(message.payload.url, message.payload.filename).then((result) =>
-        sendResponse(result)
-      )
+    case "REMOVE_ITEMS": {
+      const ids = message.payload as string[]
+      removeItems(ids).then(() => sendResponse({ success: true }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
+    }
 
     case "BATCH_DOWNLOAD":
-      batchDownload(message.payload).then((result) => sendResponse(result))
+      batchDownload(message.payload as MessagePayloads["BATCH_DOWNLOAD"]).then((result) => sendResponse(result))
       return true
 
     default:
-      sendResponse({ success: false })
+      sendResponse({ success: false, error: "未知消息类型" })
       return false
   }
 })
@@ -140,6 +188,7 @@ function collectAndNotify(
     groupIndex?: number
     width?: number
     height?: number
+    author?: string
   },
   callback?: (result: { success: boolean; error?: string; item?: MediaItem }) => void
 ) {
@@ -155,6 +204,7 @@ function collectAndNotify(
     groupIndex: mediaData.groupIndex,
     width: mediaData.width,
     height: mediaData.height,
+    author: mediaData.author,
   }
 
   saveItem(newItem).then((result) => {

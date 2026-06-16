@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=400">
+<title>设计 A · Apple Notes 风 (Liquid Glass)</title>
+<link rel="stylesheet" href="tokens.css">
+<style>
+  /* ===== 磨砂顶栏 ===== */
+  .navbar {
+    flex-shrink: 0;
+    background: rgba(245,245,247,0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    padding: var(--sp-xs) var(--sp-lg) var(--sp-sm);
+  }
+  .nav-tools { display:flex; align-items:center; justify-content:flex-end; gap: var(--sp-xs); height: 32px; }
+  .nav-icon {
+    width: 32px; height: 32px; border-radius: 50%;
+    display:flex; align-items:center; justify-content:center;
+    cursor: pointer; color: var(--ac-blue);
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .nav-icon:hover { background: var(--divider-soft); }
+  .nav-icon svg { width: 17px; height: 17px; }
+
+  /* Large Title (display-md: 34/600) */
+  .largetitle {
+    font-family: var(--font-display);
+    font-size: 34px; font-weight: 600;
+    line-height: 1.47; letter-spacing: -0.374px;
+    padding: 0 0 var(--sp-sm);
+  }
+
+  /* 搜索 (pill, 44px 高) */
+  .searchbar {
+    background: var(--divider-soft);
+    border-radius: var(--r-pill);
+    padding: 9px var(--sp-lg);
+    display: flex; align-items: center; gap: var(--sp-xs);
+    margin-bottom: var(--sp-sm);
+    height: 44px;
+  }
+  .searchbar svg { width: 15px; height: 15px; color: var(--ink-48); flex-shrink: 0; }
+  .searchbar input {
+    border: none; background: transparent; outline: none;
+    font-family: var(--font-text);
+    font-size: 17px; color: var(--ink); flex: 1;
+  }
+  .searchbar input::placeholder { color: var(--ink-48); }
+
+  /* 分段控件 */
+  .seg {
+    background: var(--divider-soft);
+    border-radius: var(--r-sm);
+    padding: 2px;
+    display: flex;
+    margin-bottom: var(--sp-xs);
+  }
+  .seg-item {
+    flex: 1; text-align: center;
+    font-family: var(--font-text);
+    font-size: 13px; font-weight: 600;
+    padding: 6px 0;
+    border-radius: 7px;
+    color: var(--ink);
+    cursor: pointer;
+    transition: all var(--dur-fast) var(--ease-out);
+    letter-spacing: -0.08px;
+  }
+  .seg-item.active {
+    background: var(--canvas);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 0 0 0.5px rgba(0,0,0,0.04);
+  }
+
+  /* ===== 列表 ===== */
+  .list { flex: 1; overflow-y: auto; padding: var(--sp-xs) var(--sp-lg) 96px; }
+
+  .author { margin-bottom: var(--sp-xl); }
+  .author-head {
+    display: flex; align-items: center; gap: var(--sp-sm);
+    padding: var(--sp-md) var(--sp-xs) var(--sp-sm);
+  }
+  .avatar {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #FF9500, #FF6B00);
+  }
+  .avatar.b { background: linear-gradient(135deg, #5AC8FA, #007AFF); }
+  .author-name {
+    font-family: var(--font-text);
+    font-size: 17px; font-weight: 600;
+    flex: 1; letter-spacing: -0.374px;
+  }
+  .author-count {
+    font-size: 13px; color: var(--ink-48); font-weight: 400;
+  }
+
+  /* 卡片 (hairline border, 无阴影) */
+  .note {
+    background: var(--canvas);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-lg);
+    padding: var(--sp-sm);
+    margin-bottom: var(--sp-xs);
+  }
+  .note-head { display: flex; align-items: center; gap: var(--sp-xs); margin-bottom: var(--sp-sm); }
+  .note-title {
+    font-family: var(--font-text);
+    font-size: 15px; font-weight: 600; flex: 1; color: var(--ink);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.2px;
+  }
+  .badge {
+    font-size: 11px; font-weight: 600;
+    padding: 2px var(--sp-xs); border-radius: var(--r-pill);
+    background: rgba(0,102,204,0.08); color: var(--ac-blue);
+    letter-spacing: -0.08px;
+  }
+  .badge.video { background: rgba(0,0,0,0.06); color: var(--ink-80); }
+
+  /* 缩略图 (带唯一产品阴影) */
+  .thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+    gap: var(--sp-xs);
+  }
+  .thumb {
+    aspect-ratio: 1;
+    border-radius: var(--r-sm);
+    background-size: cover; background-position: center;
+    position: relative; cursor: pointer;
+    box-shadow: var(--sh-product);
+    transition: transform var(--dur-fast) var(--ease-spring);
+  }
+  .thumb:active { transform: scale(0.95); }
+  .thumb.selected::after {
+    content: ""; position: absolute; inset: 0;
+    border: 3px solid var(--ac-blue);
+    border-radius: var(--r-sm);
+  }
+  .check {
+    position: absolute; top: 4px; right: 4px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--ac-blue); border: 1.5px solid #fff;
+    display: none; align-items:center; justify-content:center;
+  }
+  .thumb.selected .check { display: flex; }
+  .check svg { width: 12px; height: 12px; color: #fff; }
+
+  /* ===== 浮动操作栏 (Liquid Glass) ===== */
+  .actionbar {
+    position: absolute; bottom: var(--sp-sm); left: var(--sp-sm); right: var(--sp-sm);
+    background: rgba(245,245,247,0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border: 0.5px solid rgba(255,255,255,0.18);
+    border-radius: var(--r-lg);
+    padding: var(--sp-xs);
+    display: flex; align-items: center; gap: var(--sp-xs);
+    z-index: 10;
+  }
+  .sel-info {
+    font-size: 15px; color: var(--ink); padding: 0 var(--sp-sm);
+    flex: 1; font-weight: 400;
+  }
+  .sel-info b { color: var(--ac-blue); font-weight: 600; }
+  .act-btn {
+    border: none; border-radius: var(--r-pill);
+    font-family: var(--font-text);
+    font-size: 15px; font-weight: 400;
+    cursor: pointer;
+    height: 36px; padding: 0 var(--sp-lg);
+    transition: transform var(--dur-fast) var(--ease-out);
+  }
+  .act-btn:active { transform: scale(0.95); }
+  .act-btn.primary { background: var(--ac-blue); color: #fff; }
+  .act-btn.danger { background: transparent; color: var(--ac-blue); }
+</style>
+</head>
+<body>
+
+<div class="navbar">
+  <div class="nav-tools">
+    <div class="nav-icon" title="选择">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/></svg>
+    </div>
+    <div class="nav-icon" title="更多">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>
+    </div>
+  </div>
+  <div class="largetitle">素材</div>
+  <div class="searchbar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+    <input placeholder="搜索">
+  </div>
+  <div class="seg">
+    <div class="seg-item active">全部</div>
+    <div class="seg-item">小红书</div>
+    <div class="seg-item">抖音</div>
+    <div class="seg-item">图片</div>
+    <div class="seg-item">视频</div>
+  </div>
+</div>
+
+<div class="list">
+
+  <div class="author">
+    <div class="author-head">
+      <div class="avatar"></div>
+      <div class="author-name">老王摄影</div>
+      <div class="author-count">23</div>
+    </div>
+    <div class="note">
+      <div class="note-head">
+        <div class="note-title">城市夜景 · 扫街合集</div>
+        <span class="badge">9 图</span>
+      </div>
+      <div class="thumbs">
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/x1/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb selected" style="background-image:url(https://picsum.photos/seed/x2/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb selected" style="background-image:url(https://picsum.photos/seed/x3/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/x4/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/x5/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/x6/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+      </div>
+    </div>
+    <div class="note">
+      <div class="note-head">
+        <div class="note-title">咖啡店里的午后光线</div>
+        <span class="badge">6 图</span>
+      </div>
+      <div class="thumbs">
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/c1/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/c2/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/c3/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/c4/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="author">
+    <div class="author-head">
+      <div class="avatar b"></div>
+      <div class="author-name">美食日记</div>
+      <div class="author-count">18</div>
+    </div>
+    <div class="note">
+      <div class="note-head">
+        <div class="note-title">周末 brunch 探店</div>
+        <span class="badge video">视频</span>
+      </div>
+      <div class="thumbs">
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/v1/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/v2/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+        <div class="thumb" style="background-image:url(https://picsum.photos/seed/v3/120)"><div class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg></div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="actionbar">
+  <div class="sel-info">已选 <b>2</b> 项</div>
+  <button class="act-btn danger">删除</button>
+  <button class="act-btn primary">下载</button>
+</div>
+
+</body>
+</html>

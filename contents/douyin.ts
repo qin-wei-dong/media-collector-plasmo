@@ -1,14 +1,39 @@
-// contents/douyin.ts — 抖音：视频采集（v2.0 保持 v1.0 逻辑）
+// contents/douyin.ts — 抖音：视频采集
 import type { PlasmoCSConfig } from "plasmo"
-import { injectStyles, HoverUIManager, showToast, extractTitle } from "../lib/base"
+import { injectStyles, HoverUIManager, showToast, extractTitle, isContextValid, registerContentMessageHandler } from "../lib/base"
 
 export const config: PlasmoCSConfig = {
   matches: ["https://www.douyin.com/*"],
   run_at: "document_idle",
 }
 
+/** 从 DOM 提取抖音作者昵称 */
+function extractDouyinAuthor(): string {
+  const authorSelectors = [
+    '[class*="author"] [class*="name"]',
+    '[class*="author"] [class*="nickname"]',
+    '[class*="author"] [class*="userName"]',
+    '[class*="author-container"] span',
+    '[class*="user-nickname"]',
+    '[class*="userName"]',
+    '[class*="nickname"]',
+    '[data-e2e="user-info"] span',
+    '[class*="author-name"]',
+    '[class*="authorName"]',
+  ]
+  for (const sel of authorSelectors) {
+    const el = document.querySelector(sel)
+    if (el) {
+      const text = (el.textContent || "").trim()
+      if (text.length >= 1 && text.length <= 30) {
+        return text
+      }
+    }
+  }
+  return ""
+}
+
 function main() {
-  console.log("🔍 素材采集助手已激活 [douyin]")
 
   injectStyles()
 
@@ -20,47 +45,48 @@ function main() {
 
   function doCollect(url: string, type: string) {
     ui.showCollected()
-    chrome.runtime.sendMessage(
-      {
-        type: "COLLECT_MEDIA",
-        payload: {
-          url,
-          type,
-          platform: "douyin",
-          title: extractTitle(),
-          sourceUrl: location.href,
-        },
-      },
-      (resp) => {
-        if (resp?.success) {
-          ui.markDone()
-          showToast("✅ 素材已采集")
-        } else {
-          ui.resetCollectState()
-          showToast(resp?.error || "采集失败")
-        }
-      }
-    )
-  }
-
-  // ====== 响应后台消息 ======
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-    if (message.type === "GET_LAST_MEDIA") {
-      const media = ui.lastMedia
-        ? {
-            url: ui.lastMedia.url,
-            type: ui.lastMedia.type,
+    if (!isContextValid()) {
+      ui.resetCollectState()
+      return
+    }
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: "COLLECT_MEDIA",
+          payload: {
+            url,
+            type,
             platform: "douyin",
             title: extractTitle(),
             sourceUrl: location.href,
+            author: extractDouyinAuthor(),
+          },
+        },
+        (resp) => {
+          if (chrome.runtime.lastError) {
+            ui.resetCollectState()
+            return
           }
-        : null
-      sendResponse({ success: true, media })
+          if (resp?.success) {
+            ui.markDone()
+            showToast("✅ 素材已采集")
+          } else {
+            ui.resetCollectState()
+            showToast(resp?.error || "采集失败")
+          }
+        }
+      )
+    } catch {
+      ui.resetCollectState()
     }
-    return true
-  })
+  }
 
-  console.log("✅ 抖音就绪 — 悬停视频采集")
+  // 注册消息监听（GET_LAST_MEDIA）
+  try {
+    registerContentMessageHandler("douyin", ui)
+  } catch {
+    // 扩展已更新，旧版 content script 静默退出
+  }
 }
 
 main()
