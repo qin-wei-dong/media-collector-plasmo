@@ -1,5 +1,5 @@
 // components/AuthorCarousel.tsx — 圆形作者头像横滑入口
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type { MediaItem } from "../types"
 import { theme, getAvatarGradient } from "../popup-theme"
 
@@ -8,6 +8,62 @@ interface AuthorCarouselProps {
   selectedAuthor?: string
   onSelect?: (author: string) => void
   maxVisible?: number
+}
+
+/** 单个头像的加载状态管理(避免互相干扰) */
+function AuthorAvatar({ author, isActive }: { author: { name: string; count: number; firstItem: MediaItem }; isActive: boolean }) {
+  const [imgLoaded, setImgLoaded] = useState(false)
+  const [imgError, setImgError] = useState(false)
+  const cover = author.firstItem.coverUrl
+
+  // coverUrl 变化时重置
+  useEffect(() => {
+    setImgLoaded(false)
+    setImgError(false)
+  }, [cover])
+
+  const showImage = cover && !imgError
+
+  return (
+    <div
+      style={{
+        ...styles.avatar,
+        ...(isActive ? styles.avatarActive : {}),
+      }}
+    >
+      {/* 渐变底色:加载占位 + 失败回退 */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          borderRadius: "inherit",
+          backgroundImage: getAvatarGradient(author.name),
+        }}
+        aria-hidden="true"
+      />
+      {/* 封面图:加载完成后淡入 */}
+      {showImage && (
+        <img
+          src={cover}
+          alt=""
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            borderRadius: "inherit",
+            opacity: imgLoaded ? 1 : 0,
+            transition: `opacity ${theme.durFast} ${theme.easeOut}`,
+          }}
+          onLoad={() => setImgLoaded(true)}
+          onError={() => setImgError(true)}
+        />
+      )}
+      <span style={styles.count}>{author.count}</span>
+    </div>
+  )
 }
 
 export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible = 5 }: AuthorCarouselProps) {
@@ -32,7 +88,7 @@ export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible =
         )}
       </div>
       <div style={styles.carouselWrap}>
-        <div 
+        <div
           style={styles.carousel}
           onScroll={(e) => {
             const target = e.target as HTMLDivElement
@@ -51,19 +107,7 @@ export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible =
               }}
               onClick={() => onSelect?.(isActive ? "" : a.name)}
             >
-              <div
-                style={{
-                  ...styles.avatar,
-                  ...(isActive ? styles.avatarActive : {}),
-                  backgroundImage: a.firstItem.coverUrl
-                    ? `url(${a.firstItem.coverUrl})`
-                    : getAvatarGradient(a.name),
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }}
-              >
-                <span style={styles.count}>{a.count}</span>
-              </div>
+              <AuthorAvatar author={a} isActive={isActive} />
               <div style={{
                   ...styles.name,
                   ...(isActive ? styles.nameActive : {}),
@@ -73,7 +117,19 @@ export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible =
 
           {/* 折叠状态下显示「查看全部」入口 */}
           {!expanded && hiddenCount > 0 && (
-            <div style={styles.card} onClick={() => setExpanded(true)}>
+            <div
+              style={styles.card}
+              onClick={() => setExpanded(true)}
+              role="button"
+              tabIndex={0}
+              aria-label={`查看全部 ${authors.length} 位作者`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  setExpanded(true)
+                }
+              }}
+            >
               <div style={{ ...styles.avatar, ...styles.moreAvatar }}>
                 <span style={styles.moreCount}>+{hiddenCount}</span>
               </div>
@@ -83,9 +139,21 @@ export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible =
 
           {/* 展开状态下显示「收起」 */}
           {expanded && hiddenCount > 0 && (
-            <div style={styles.card} onClick={() => setExpanded(false)}>
+            <div
+              style={styles.card}
+              onClick={() => setExpanded(false)}
+              role="button"
+              tabIndex={0}
+              aria-label="收起作者列表"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  setExpanded(false)
+                }
+              }}
+            >
               <div style={{ ...styles.avatar, ...styles.moreAvatar }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                   <polyline points="18 15 12 9 6 15" />
                 </svg>
               </div>
@@ -93,7 +161,7 @@ export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible =
             </div>
           )}
         </div>
-        
+
         {/* 滚动提示渐变遮罩 */}
         {showScrollHint && !expanded && authors.length > maxVisible && (
           <div style={styles.scrollHint} />
@@ -104,35 +172,35 @@ export function AuthorCarousel({ authors, selectedAuthor, onSelect, maxVisible =
 }
 
 const styles: Record<string, React.CSSProperties> = {
-  section: { padding: "0 0 14px" },
+  section: { padding: `0 0 ${theme.sp.sm + 2}px` },
   head: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "0 16px 8px",
+    padding: `0 ${theme.sp.md}px ${theme.sp.xs}px`,
   },
   headLeft: {
     display: "flex",
     alignItems: "baseline",
-    gap: 8,
+    gap: theme.sp.xs,
   },
-  title: { fontSize: 17, fontWeight: 700, letterSpacing: "-0.3px", color: theme.textPrimary },
-  badge: { 
-    fontSize: 11, 
-    color: theme.textTertiary, 
+  title: { fontSize: theme.fs.title, fontWeight: 700, letterSpacing: "-0.3px", color: theme.textPrimary },
+  badge: {
+    fontSize: theme.fs.micro,
+    color: theme.textTertiary,
     fontWeight: 500,
     background: theme.card,
     padding: "2px 7px",
-    borderRadius: 6,
+    borderRadius: theme.r.xs,
   },
   clearBtn: {
     border: "none",
     background: "rgba(255,255,255,0.1)",
     color: theme.textSecondary,
-    fontSize: 11,
+    fontSize: theme.fs.micro,
     fontWeight: 500,
     padding: "3px 8px",
-    borderRadius: 6,
+    borderRadius: theme.r.xs,
     cursor: "pointer",
     transition: `all ${theme.durFast} ease`,
   },
@@ -143,7 +211,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     gap: 10,
     overflowX: "auto",
-    padding: "0 16px 4px",
+    padding: `0 ${theme.sp.md}px ${theme.sp.xxs}px`,
     scrollSnapType: "x mandatory",
     scrollbarWidth: "thin",
     scrollbarColor: "rgba(255,255,255,0.15) transparent",
@@ -154,7 +222,7 @@ const styles: Record<string, React.CSSProperties> = {
     top: 0,
     bottom: 4,
     width: 50,
-    background: "linear-gradient(to right, transparent, #0a0a0c)",
+    background: `linear-gradient(to right, transparent, ${theme.bg})`,
     pointerEvents: "none",
   },
   card: {
@@ -167,7 +235,7 @@ const styles: Record<string, React.CSSProperties> = {
   avatar: {
     width: 64,
     height: 64,
-    borderRadius: "50%",
+    borderRadius: theme.r.pill,
     margin: "0 auto",
     boxShadow: theme.shadowCard,
     position: "relative",
@@ -177,7 +245,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: `box-shadow ${theme.durFast} ease`,
   },
   avatarActive: {
-    boxShadow: "0 0 0 3px #fff, 0 8px 20px rgba(0,0,0,0.5)",
+    boxShadow: `0 0 0 3px ${theme.accent}, 0 8px 20px rgba(0,0,0,0.5)`,
   },
   moreAvatar: {
     background: theme.cardHover,
@@ -198,14 +266,14 @@ const styles: Record<string, React.CSSProperties> = {
     background: "#fff",
     color: "#000",
     padding: "1px 5px",
-    borderRadius: 6,
-    border: "2px solid #1c1c1e",
+    borderRadius: theme.r.xs,
+    border: `2px solid ${theme.bgGradient}`,
   },
   cardActive: {
     opacity: 1,
   },
   name: {
-    fontSize: 11,
+    fontSize: theme.fs.micro,
     color: theme.textSecondary,
     marginTop: 6,
     fontWeight: 500,

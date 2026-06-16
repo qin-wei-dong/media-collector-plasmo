@@ -47,8 +47,8 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
     <div style={styles.overlay} onClick={onClose}>
       {/* 顶栏 */}
       <div style={styles.topbar} onClick={(e) => e.stopPropagation()}>
-        <button style={styles.closeBtn} onClick={onClose}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+        <button style={styles.closeBtn} onClick={onClose} aria-label="关闭预览" title="关闭">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -66,8 +66,13 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
       <div style={styles.content} onClick={(e) => e.stopPropagation()}>
         {/* 左箭头 */}
         {currentIndex > 0 && (
-          <button style={{ ...styles.navBtn, ...styles.navLeft }} onClick={goPrev}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <button
+            style={{ ...styles.navBtn, ...styles.navLeft }}
+            onClick={goPrev}
+            aria-label="上一张"
+            title="上一张"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
               <polyline points="15 18 9 12 15 6" />
             </svg>
           </button>
@@ -81,19 +86,20 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
             controls
             autoPlay
             onClick={(e) => e.stopPropagation()}
+            aria-label={`视频预览 ${item.title || "未命名素材"}`}
           />
         ) : (
           <div style={styles.imgContainer}>
             {imgLoading && !imgError && (
-              <div style={styles.loadingSpinner}>
+              <div style={styles.loadingSpinner} aria-hidden="true">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: "mc-spin 0.8s linear infinite" }}>
                   <path d="M21 12a9 9 0 1 1-6.219-8.56" />
                 </svg>
               </div>
             )}
             {imgError ? (
-              <div style={styles.errorState}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <div style={styles.errorState} role="img" aria-label="图片加载失败">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
                   <circle cx="12" cy="12" r="10" />
                   <line x1="15" y1="9" x2="9" y2="15" />
                   <line x1="9" y1="9" x2="15" y2="15" />
@@ -101,12 +107,13 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
                 <span>图片加载失败</span>
               </div>
             ) : (
-              <img 
-                src={src} 
-                style={{ ...styles.img, opacity: imgLoading ? 0 : 1 }} 
+              <img
+                src={src}
+                style={{ ...styles.img, opacity: imgLoading ? 0 : 1 }}
                 onClick={(e) => e.stopPropagation()}
                 onLoad={() => setImgLoading(false)}
                 onError={() => { setImgLoading(false); setImgError(true) }}
+                alt={item.title || "未命名素材"}
               />
             )}
           </div>
@@ -114,8 +121,13 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
 
         {/* 右箭头 */}
         {currentIndex < siblings.length - 1 && (
-          <button style={{ ...styles.navBtn, ...styles.navRight }} onClick={goNext}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <button
+            style={{ ...styles.navBtn, ...styles.navRight }}
+            onClick={goNext}
+            aria-label="下一张"
+            title="下一张"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
               <polyline points="9 18 15 12 9 6" />
             </svg>
           </button>
@@ -145,9 +157,10 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
                   chrome.tabs.create({ url: item.sourceUrl, active: false })
                 } catch {}
               }}
+              aria-label="在新标签页打开原笔记"
               title="打开原笔记"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                 <polyline points="15 3 21 3 21 9" />
                 <line x1="10" y1="14" x2="21" y2="3" />
@@ -171,18 +184,18 @@ const styles: Record<string, React.CSSProperties> = {
     WebkitBackdropFilter: theme.glassBlurStrong,
     display: "flex",
     flexDirection: "column",
-    borderRadius: 16,
+    borderRadius: theme.r.lg,
   },
   topbar: {
     display: "flex",
     alignItems: "center",
-    padding: "14px 16px",
+    padding: `14px ${theme.sp.md}px`,
     flexShrink: 0,
   },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: "50%",
+    width: theme.btn.sm,
+    height: theme.btn.sm,
+    borderRadius: theme.r.pill,
     border: "none",
     background: theme.cardHover,
     color: "#fff",
@@ -193,21 +206,21 @@ const styles: Record<string, React.CSSProperties> = {
   },
   topInfo: { flex: 1, marginLeft: 12, minWidth: 0 },
   topTitle: {
-    fontSize: 15,
+    fontSize: theme.fs.bodyLg,
     fontWeight: 600,
     color: "#fff",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   },
-  topCounter: { fontSize: 12, color: theme.textTertiary, marginTop: 2 },
-  spacer: { width: 32 },
+  topCounter: { fontSize: theme.fs.caption, color: theme.textTertiary, marginTop: 2 },
+  spacer: { width: theme.btn.sm },
   content: {
     flex: 1,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "0 8px",
+    padding: `0 ${theme.sp.xs}px`,
     position: "relative",
     minHeight: 0,
   },
@@ -223,13 +236,13 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: "100%",
     maxHeight: "100%",
     objectFit: "contain",
-    borderRadius: 8,
+    borderRadius: theme.r.sm,
     transition: "opacity 0.2s ease",
   },
   video: {
     maxWidth: "100%",
     maxHeight: "100%",
-    borderRadius: 8,
+    borderRadius: theme.r.sm,
   },
   loadingSpinner: {
     position: "absolute",
@@ -241,15 +254,15 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: "center",
     gap: 12,
     color: "rgba(255,255,255,0.5)",
-    fontSize: 14,
+    fontSize: theme.fs.body,
   },
   navBtn: {
     position: "absolute",
     top: "50%",
     transform: "translateY(-50%)",
-    width: 40,
-    height: 40,
-    borderRadius: "50%",
+    width: theme.btn.lg,
+    height: theme.btn.lg,
+    borderRadius: theme.r.pill,
     border: "1px solid rgba(255,255,255,0.2)",
     background: "rgba(255,255,255,0.12)",
     backdropFilter: theme.glassBlur,
@@ -262,13 +275,13 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 2,
     transition: `all ${theme.durFast} ${theme.easeOut}`,
   },
-  navLeft: { left: 8 },
-  navRight: { right: 8 },
+  navLeft: { left: theme.sp.xs },
+  navRight: { right: theme.sp.xs },
   footer: {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "14px 16px",
+    padding: `14px ${theme.sp.md}px`,
     flexShrink: 0,
   },
   footerLeft: {
@@ -287,7 +300,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 4,
-    fontSize: 11,
+    fontSize: theme.fs.micro,
     color: "rgba(255,255,255,0.4)",
   },
   kbd: {
@@ -300,7 +313,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "rgba(255,255,255,0.1)",
     border: "1px solid rgba(255,255,255,0.15)",
     borderRadius: 4,
-    fontSize: 11,
+    fontSize: theme.fs.micro,
     fontFamily: "inherit",
   },
   sourceBtn: {
@@ -310,10 +323,10 @@ const styles: Record<string, React.CSSProperties> = {
     border: "1px solid rgba(255,255,255,0.15)",
     background: "rgba(255,255,255,0.08)",
     color: "#fff",
-    fontSize: 12,
+    fontSize: theme.fs.caption,
     fontWeight: 500,
-    padding: "5px 12px",
-    borderRadius: 12,
+    padding: `5px ${theme.sp.sm}px`,
+    borderRadius: theme.r.sm,
     cursor: "pointer",
     fontFamily: "inherit",
     transition: `all ${theme.durFast} ${theme.easeOut}`,

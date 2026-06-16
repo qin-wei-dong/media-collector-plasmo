@@ -1,5 +1,5 @@
 // components/FloatBar.tsx — 深色重度磨砂浮动操作栏
-import { useState } from "react"
+// 删除交互改为:点击立即删除 + 底部 Toast「已删除 N 项」+ 5 秒可撤销(P0-4)
 import { theme } from "../popup-theme"
 
 interface FloatBarProps {
@@ -11,36 +11,16 @@ interface FloatBarProps {
   onToggleSelectAll: () => void
 }
 
-export function FloatBar({ selectedCount, totalCount, downloading, onDownload, onDelete, onToggleSelectAll }: FloatBarProps) {
-  const [confirmDelete, setConfirmDelete] = useState(false)
-  const [deleteProgress, setDeleteProgress] = useState(0)
+export function FloatBar({
+  selectedCount,
+  totalCount,
+  downloading,
+  onDownload,
+  onDelete,
+  onToggleSelectAll,
+}: FloatBarProps) {
   const allSelected = totalCount > 0 && selectedCount >= totalCount
   const nothingSelected = selectedCount === 0
-
-  const handleDeleteClick = () => {
-    if (confirmDelete) {
-      onDelete()
-      setConfirmDelete(false)
-      setDeleteProgress(0)
-    } else {
-      setConfirmDelete(true)
-      setDeleteProgress(100)
-      // 3 秒后自动取消确认态（带进度动画）
-      const startTime = Date.now()
-      const duration = 3000
-      const animate = () => {
-        const elapsed = Date.now() - startTime
-        const remaining = Math.max(0, 100 - (elapsed / duration) * 100)
-        setDeleteProgress(remaining)
-        if (remaining > 0) {
-          requestAnimationFrame(animate)
-        } else {
-          setConfirmDelete(false)
-        }
-      }
-      requestAnimationFrame(animate)
-    }
-  }
 
   return (
     <div style={styles.bar}>
@@ -51,42 +31,27 @@ export function FloatBar({ selectedCount, totalCount, downloading, onDownload, o
         </div>
       )}
       <div style={styles.pill}>
-        <div style={{ 
-          ...styles.circle, 
-          ...(confirmDelete ? styles.circleDanger : {}) 
-        }}>
-          {confirmDelete ? "!" : selectedCount}
+        <div style={{ ...styles.circle, ...(nothingSelected ? styles.circleIdle : {}) }}>
+          {nothingSelected ? "+" : selectedCount}
         </div>
         <span style={styles.text}>
-          {nothingSelected
-            ? `共 ${totalCount} 项`
-            : confirmDelete
-              ? `确认删除 ${selectedCount} 项？`
-              : `已选 ${selectedCount} 项`}
+          {nothingSelected ? `共 ${totalCount} 项,点击卡片选择` : `已选 ${selectedCount} 项`}
         </span>
-        {/* 删除确认进度条 */}
-        {confirmDelete && (
-          <div style={styles.deleteProgress}>
-            <div style={{ 
-              ...styles.deleteProgressFill, 
-              width: `${deleteProgress}%` 
-            }} />
-          </div>
-        )}
       </div>
       <button
         style={styles.icon}
         onClick={onToggleSelectAll}
+        aria-label={allSelected ? "取消全选" : "全选当前结果"}
         title={allSelected ? "取消全选" : "全选"}
       >
         {allSelected ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="6" y="4" width="12" height="16" rx="2" />
             <line x1="10" y1="10" x2="14" y2="14" />
             <line x1="14" y1="10" x2="10" y2="14" />
           </svg>
         ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="6" y="4" width="12" height="16" rx="2" />
             <polyline points="9 12 11 14 15 10" />
           </svg>
@@ -96,14 +61,25 @@ export function FloatBar({ selectedCount, totalCount, downloading, onDownload, o
         style={{ ...styles.icon, ...(downloading || nothingSelected ? styles.iconDisabled : {}) }}
         onClick={onDownload}
         disabled={downloading || nothingSelected}
+        aria-label="下载选中素材"
+        aria-disabled={downloading || nothingSelected}
         title="下载"
       >
         {downloading ? (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: "mc-spin 0.8s linear infinite" }}>
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            style={{ animation: "mc-spin 0.8s linear infinite" }}
+            aria-hidden="true"
+          >
             <path d="M21 12a9 9 0 1 1-6.219-8.56" />
           </svg>
         ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" y1="15" x2="12" y2="3" />
@@ -111,19 +87,17 @@ export function FloatBar({ selectedCount, totalCount, downloading, onDownload, o
         )}
       </button>
       <button
-        style={{ ...styles.icon, ...(nothingSelected ? styles.iconDisabled : confirmDelete ? styles.iconConfirm : styles.iconDanger) }}
-        onClick={handleDeleteClick}
+        style={{ ...styles.icon, ...(nothingSelected ? styles.iconDisabled : styles.iconDanger) }}
+        onClick={onDelete}
         disabled={nothingSelected}
-        title={confirmDelete ? "再次点击确认删除" : "删除"}
+        aria-label="删除选中素材"
+        aria-disabled={nothingSelected}
+        title="删除"
       >
-        {confirmDelete ? (
-          <span style={{ fontSize: 11, fontWeight: 700 }}>确认</span>
-        ) : (
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="3 6 5 6 21 6" />
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-          </svg>
-        )}
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <polyline points="3 6 5 6 21 6" />
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+        </svg>
       </button>
     </div>
   )
@@ -139,7 +113,7 @@ const styles: Record<string, React.CSSProperties> = {
     backdropFilter: theme.glassBlurStrong,
     WebkitBackdropFilter: theme.glassBlurStrong,
     border: `0.5px solid ${theme.hairline}`,
-    borderRadius: theme.r.xl,
+    borderRadius: theme.r.lg,
     padding: 7,
     display: "flex",
     alignItems: "center",
@@ -158,7 +132,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressFill: {
     height: "100%",
-    background: "linear-gradient(90deg, #007AFF, #5AC8FA)",
+    background: `linear-gradient(90deg, ${theme.accent}, ${theme.accentLight})`,
     animation: "mc-progress 0.8s ease-in-out infinite",
     width: "30%",
   },
@@ -173,7 +147,7 @@ const styles: Record<string, React.CSSProperties> = {
   circle: {
     width: 26,
     height: 26,
-    borderRadius: "50%",
+    borderRadius: theme.r.pill,
     background: "#fff",
     color: "#000",
     display: "flex",
@@ -182,31 +156,21 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 700,
     transition: `all ${theme.durFast} ease`,
+    flexShrink: 0,
   },
-  circleDanger: {
-    background: "#FF453A",
-    color: "#fff",
+  // P2-3: 0 选时用 dashed 描边 + 加号占位,引导用户点击卡片选择
+  circleIdle: {
+    background: "transparent",
+    color: theme.textSecondary,
+    border: `1.5px dashed ${theme.hairline}`,
+    fontSize: 16,
+    fontWeight: 400,
   },
-  text: { fontSize: 14, color: theme.textSecondary },
-  deleteProgress: {
-    position: "absolute",
-    bottom: -4,
-    left: 12,
-    right: 12,
-    height: 2,
-    background: "rgba(255,69,58,0.2)",
-    borderRadius: 1,
-  },
-  deleteProgressFill: {
-    height: "100%",
-    background: "#FF453A",
-    borderRadius: 1,
-    transition: "width 0.1s linear",
-  },
+  text: { fontSize: theme.fs.body, color: theme.textSecondary },
   icon: {
-    width: 38,
-    height: 38,
-    borderRadius: "50%",
+    width: theme.btn.md,
+    height: theme.btn.md,
+    borderRadius: theme.r.pill,
     border: "none",
     background: theme.cardHover,
     display: "flex",
@@ -214,9 +178,9 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: "center",
     cursor: "pointer",
     color: "#fff",
-    transition: `transform ${theme.durFast} ${theme.easeSpring}`,
+    transition: `transform ${theme.durFast} ${theme.easeSpring}, opacity ${theme.durFast} ${theme.easeOut}`,
   },
-  iconDanger: { background: theme.danger, color: theme.dangerText },
-  iconConfirm: { background: "#FF453A", color: "#fff" },
+  // 警示底色,让删除按钮即使在 idle 态也有"危险"语义
+  iconDanger: { background: theme.dangerBg, color: theme.dangerText },
   iconDisabled: { opacity: 0.4, cursor: "default" },
 }

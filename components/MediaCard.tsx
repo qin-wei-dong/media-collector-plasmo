@@ -27,13 +27,23 @@ export function MediaCard({
   return (
     <div style={styles.card}>
       <div
+        className="mc-card-art"
         style={{
           ...styles.art,
           boxShadow: selected
-            ? `0 0 0 3px #fff, ${theme.shadowCard}`
+            ? `0 0 0 3px ${theme.accent}, ${theme.shadowCard}`
             : theme.shadowCard,
         }}
         onClick={onPreview}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault()
+            onPreview()
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-label={`预览素材 ${item.title || "未命名"}`}
       >
         {/* 封面图:加载失败露出渐变底 */}
         {!imgError ? (
@@ -47,7 +57,7 @@ export function MediaCard({
 
         {/* 视频角标:右下角播放图标 */}
         {isVideo && (
-          <div style={styles.videoBadge}>
+          <div style={styles.videoBadge} aria-hidden="true">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="6 4 20 12 6 20" />
             </svg>
@@ -56,7 +66,7 @@ export function MediaCard({
 
         {/* 多图计数 */}
         {!isVideo && imageCountInNote && imageCountInNote > 1 && (
-          <span style={styles.multiBadge}>{imageCountInNote}</span>
+          <span style={styles.multiBadge} aria-hidden="true">{imageCountInNote}</span>
         )}
 
         {/* 选中圆圈(独立点击区,不触发预览) */}
@@ -66,10 +76,11 @@ export function MediaCard({
             e.stopPropagation()
             onToggleSelect()
           }}
-          title={selected ? "取消选择" : "选择"}
+          aria-label={selected ? "取消选择该素材" : "选择该素材"}
+          aria-pressed={selected}
         >
           {selected && (
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           )}
@@ -93,7 +104,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: "relative",
     overflow: "hidden",
     cursor: "pointer",
-    transition: `transform ${theme.durFast} ${theme.easeSpring}`,
+    transition: `transform ${theme.durFast} ${theme.easeSpring}, box-shadow ${theme.durFast} ${theme.easeOut}`,
     // 渐变底:图片加载失败时作为占位
     background: "linear-gradient(135deg, #2a2a2e 0%, #3a3a3e 50%, #2a2a2e 100%)",
   },
@@ -108,9 +119,9 @@ const styles: Record<string, React.CSSProperties> = {
     position: "absolute",
     bottom: 7,
     right: 7,
-    width: 22,
-    height: 22,
-    borderRadius: "50%",
+    width: theme.btn.xs,
+    height: theme.btn.xs,
+    borderRadius: theme.r.pill,
     background: "rgba(0,0,0,0.6)",
     backdropFilter: "blur(8px)",
     WebkitBackdropFilter: "blur(8px)",
@@ -123,22 +134,22 @@ const styles: Record<string, React.CSSProperties> = {
     position: "absolute",
     top: 7,
     right: 7,
-    fontSize: 11,
+    fontSize: theme.fs.micro,
     fontWeight: 700,
     background: "rgba(0,0,0,0.6)",
     backdropFilter: theme.glassBlur,
     WebkitBackdropFilter: theme.glassBlur,
     color: "#fff",
     padding: "2px 7px",
-    borderRadius: 6,
+    borderRadius: theme.r.xs,
   },
   selectBtn: {
     position: "absolute",
     top: 7,
     left: 7,
-    width: 22,
-    height: 22,
-    borderRadius: "50%",
+    width: theme.btn.xs,
+    height: theme.btn.xs,
+    borderRadius: theme.r.pill,
     border: "1.5px solid rgba(255,255,255,0.9)",
     background: "rgba(0,0,0,0.3)",
     padding: 0,
@@ -150,11 +161,11 @@ const styles: Record<string, React.CSSProperties> = {
     transition: `all ${theme.durFast} ${theme.easeSpring}`,
   },
   selectBtnActive: {
-    background: "#007AFF",
+    background: theme.accent,
     borderColor: "#fff",
   },
   title: {
-    fontSize: 12,
+    fontSize: theme.fs.caption,
     fontWeight: 600,
     marginTop: 7,
     color: theme.textPrimary,
@@ -164,7 +175,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: "-0.1px",
   },
   meta: {
-    fontSize: 11,
+    fontSize: theme.fs.micro,
     color: theme.textTertiary,
     marginTop: 1,
     overflow: "hidden",

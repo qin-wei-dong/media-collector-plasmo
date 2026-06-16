@@ -35,6 +35,7 @@ export type MessageType =
   | "GET_LAST_MEDIA"
   | "INJECT_MAIN_WORLD"
   | "REMOVE_ITEMS"
+  | "RESTORE_ITEMS"
 
 export interface MessagePayloads {
   COLLECT_MEDIA: {
@@ -67,6 +68,7 @@ export interface MessagePayloads {
   BATCH_DOWNLOAD: Array<{ url: string; filename: string; platform?: Platform }>
   GET_LAST_MEDIA: void
   REMOVE_ITEMS: string[]
+  RESTORE_ITEMS: MediaItem[]
 }
 
 export interface MessageResponse {

@@ -238,6 +238,39 @@ popup → background:
 
 ---
 
+### 坑 11:popup 设计 token 双源导致后期统一困难
+
+**症状**:`mockups/tokens.css` 里有完整的 Apple Liquid Glass 规范(强调色 `#0066cc`、圆角 5 档、8pt 间距),popup 实现时另起 `popup-theme.ts` 用 `accent: #ffffff`、圆角 6 档 (8/10/14/16/22/pill)、间距不系统。代码长出来一两年后,产品要换品牌色 / 调圆角 / 加 button size 时,要在两套体系里都改,且容易遗漏。
+
+**根因**:设计 token 没有真正成为"单一真相源"——`mockups/tokens.css` 只是参考 demo,`popup-theme.ts` 是实际生效源;两者没人强制对齐,各写各的。
+
+**解法**:
+- 在 popup-theme.ts 顶部加注释明确「这是唯一权威源,禁止内联 hex」
+- 把圆角档收齐为 5 档(5/8/11/18/pill)与 tokens.css 对齐
+- 新增 `sp`(8pt 间距 7 档) / `btn`(按钮尺寸 4 档) / `fs`(字号 6 档) / `focus`(focus ring) token,把组件里所有 magic value 替换成 token
+- 用 `pnpm build` 不报错当唯一校验(没有 lint 强制使用 token),但把规则写进 `popup-theme.ts` 顶部 doc comment + CLAUDE.md「Key Conventions」段落
+
+**教训**:**设计 token 必须单源,要么完全用 CSS 变量(让设计师改 CSS 就生效),要么完全用 TS object(让 TS 类型系统兜底),不要"两份规范"**。一旦双源,后期统一成本指数增长。理想方案:把 tokens.css 迁移成 TS module,组件 props 接受 token 名而非 magic number——目前未实现(P3-19)。
+
+---
+
+### 坑 12:删除确认用「时间倒计时」是反人类设计
+
+**症状**:FloatBar 删除按钮点击后,按钮变红 + 文字变「确认」+ 底部出现一根 2px 红色细线,3 秒内必须再点一次,否则自动取消。用户反馈"完全看不懂在倒计时什么"、"线太细根本注意不到"。
+
+**根因**:用「时间窗口 + 二次点击」做确认,意图是防止误删,但把"窗口状态"用了一个非常弱的视觉信号(2px 细线)承载,普通用户完全无感。同时没有取消入口,只能等 3 秒。
+
+**解法**:改为现代 UX 标准模式 —— **立即删除 + 底部 Toast「已删除 N 项」+ 5 秒可点「撤销」**:
+- `components/Toast.tsx` 通用 snackbar(支持 action 按钮 + 自动消失 + 入场动画)
+- `types.ts` 新增 `RESTORE_ITEMS` 消息 + `MessagePayloads`
+- `background/storage.ts` 新增 `restoreItems(items)`,按 id 去重,保留原始 `id` / `collectedAt`,让撤销后的排序与删除前完全一致
+- `popup.tsx` 在删除前 `setDeletedBackup(selectedItems.map(({_selected, ...rest}) => rest))` 备份,点击撤销时 `sendMessage({type:"RESTORE_ITEMS", payload: deletedBackup})`
+- FloatBar 简化为单次点击 + 删除按钮恢复普通垃圾桶图标(不再有"确认态")
+
+**教训**:**删除这类高破坏操作,UX 的金标准是「立即生效 + 可撤销」**(Gmail / Notion / Apple 邮件都是这套),而不是「二次确认 + 时间窗口」**。后者要么用 modal(强阻断),要么用足够强的视觉信号承载倒计时;细线 + 自动取消 = 普通用户直接错过。改造前用模态弹窗也行,但 Toast 撤销对批量删除更友好。
+
+---
+
 ## 四、快速自检清单
 
 下次改代码前,过一遍这个清单:
@@ -245,6 +278,7 @@ popup → background:
 - [ ] **改 content script / background 后**:必须刷新扩展 + 关闭目标站点所有标签 + 新开标签
 - [ ] **只有单个 dev server**:`ps aux | grep plasmo` 确认无残留进程
 - [ ] **新增/改字段**:grep 全局搜索字段名,确认 types / 采集端 / background / 组件全链路透传
+- [ ] **新增 MessageType**:同步更新 `types.ts` 的 `MessageType` 联合 + `MessagePayloads`,background 的 `switch` 用 `as MessagePayloads["YOUR_TYPE"]` 收窄
 - [ ] **滚动条/伪元素**:不能用 inline style,必须放 `<style>` 标签
 - [ ] **注入页面 context**:严格 CSP 站点用 `chrome.scripting.executeScript`,不用 inline `<script>`
 - [ ] **第三方页面 UI**:挂进页面 DOM 层级(如浮层内),不要孤立挂 body
@@ -252,6 +286,9 @@ popup → background:
 - [ ] **轮播/SPA 找"可见"元素**:用与视口的交集面积判断,不能用元素自身面积/offsetParent
 - [ ] **动效中的定位**:不要"边算边显示",用稳定性确认(连续两次坐标一致)再显示,避免跳动
 - [ ] **用户说"不满意"**:先问方向,不要闷头微调细节
+- [ ] **设计 token 必须单源**:改色 / 圆角 / 间距时改 `popup-theme.ts` 一处即可,组件禁止内联 magic value
+- [ ] **icon-only 按钮必带 aria-label**:Tab 键用户和读屏用户的可达性基本要求
+- [ ] **删除等破坏性操作**:用 Toast 撤销,不用「时间倒计时二次确认」
 - [ ] **调试定位问题**:不要盲改,先用 `getBoundingClientRect()` dump 实际坐标,用真实数据定位根因
 - [ ] **跨层 API**:确认每个 chrome.*/DOM API 在哪个层(background/content/popup)跑,该层支不支持
   - `chrome.downloads/scripting/tabs` → 只在 background service worker

@@ -109,26 +109,33 @@ function extractXHSNoteImages(): ImageData[] {
 
 ## 四、架构重构
 
-### 4.1 目录结构
+### 4.1 目录结构(Phase 5 后)
 
 ```
 media-collector-plasmo/
 ├── contents/                    ← 拆分为多平台
-│   ├── xiaohongshu.ts           ← 小红书：单图 + 多图提取（ISOLATED world）
-│   ├── xiaohongshu-state.ts     ← 小红书：拦截 __INITIAL_STATE__（MAIN world）
-│   └── douyin.ts                ← 抖音：视频采集
+│   ├── xiaohongshu.ts           ← 小红书:浮层采集器(请求注入 MAIN world + 启动 startDetailCollector)
+│   └── douyin.ts                ← 抖音:hover 采集
 ├── background/
-│   ├── index.ts                 ← 消息路由 + 安装初始化
-│   ├── storage.ts               ← 存储 CRUD（带写锁）
-│   └── download.ts              ← 单条/批量下载
+│   ├── index.ts                 ← 消息路由 + install + 右键菜单 + 快捷键 + RESTORE_ITEMS
+│   ├── storage.ts               ← 存储 CRUD(带写锁) + restoreItems(删除撤销)
+│   └── download.ts              ← 单条/批量下载(SW fetch + Referer + data URL)
 ├── lib/
-│   └── base.ts                  ← 共享：悬停检测、按钮渲染、Toast
-├── components/
-│   ├── MediaCard.tsx            ← 素材卡片
-│   ├── BatchBar.tsx             ← 批量操作栏
-│   ├── PlatformFilter.tsx       ← 平台筛选
-│   └── NoteGroup.tsx            ← 笔记分组折叠
+│   ├── base.ts                  ← 抖音用:悬停检测 / 按钮渲染
+│   ├── xhs-state-inject.ts      ← stateInjector():被 background executeScript 注入 MAIN world
+│   ├── xhs-detail-collector.ts  ← 小红书浮层 DOM 检测 + 「采集素材」按钮跟随
+│   └── xhs-image-extractor.ts   ← 小红书笔记媒体提取(__mc_notes__ / __mc_state__ 两通路)
+├── components/                  ← popup 用 React 组件(Apple Music 风)
+│   ├── Hero.tsx                 ← 最新素材大图 + 快速操作(下载/原帖)
+│   ├── AuthorCarousel.tsx       ← 作者头像横向轮播
+│   ├── MediaCard.tsx            ← 单素材封面卡(1:1,hover/press 反馈)
+│   ├── FloatBar.tsx             ← 浮动操作栏(全选 / 批量下载 / 删除)
+│   ├── PreviewModal.tsx         ← 大图预览(同笔记左右切换 + 键盘)
+│   ├── EmptyState.tsx           ← 空状态(三步图示 + 快捷键提示)
+│   └── Toast.tsx                ← 底部 snackbar(删除撤销 / 错误提示)
 ├── popup.tsx                    ← 弹窗主组件
+├── popup-theme.ts               ← 主题 token 唯一权威源
+├── popup.html                   ← 弹窗容器(460px / 圆角 / 隐藏滚动条)
 ├── types.ts                     ← 共享类型定义
 └── assets/
 ```
@@ -163,16 +170,18 @@ interface MediaItem {
 ### 4.3 消息类型扩展
 
 ```typescript
-// 新增消息类型
 type MessageType =
-  | "COLLECT_MEDIA"           // 采集单个（现有）
-  | "COLLECT_NOTE_IMAGES"     // 采集整个笔记的全部图片（新增）
-  | "EXTRACT_VIDEO_INFO"      // 提取视频页信息（新增，background 处理）
-  | "GET_ITEMS"               // 获取列表（现有）
-  | "CLEAR_ITEMS"             // 清空（现有）
-  | "DOWNLOAD_ITEM"           // 单条下载（现有）
-  | "BATCH_DOWNLOAD"          // 批量下载（现有）
-  | "GET_LAST_MEDIA"          // 获取最后悬停（现有）
+  | "COLLECT_MEDIA"           // 采集单个(现有)
+  | "COLLECT_NOTE_IMAGES"     // 采集整个笔记的全部图片(Phase 3)
+  | "GET_ITEMS"               // 获取列表(现有)
+  | "CLEAR_ITEMS"             // 清空(现有)
+  | "BATCH_DOWNLOAD"          // 批量下载(现有)
+  | "GET_LAST_MEDIA"          // 获取最后悬停(现有)
+  | "INJECT_MAIN_WORLD"       // 请求 background 注入 MAIN world 拦截器(Phase 5)
+  | "REMOVE_ITEMS"            // 删除选中(Phase 4)
+  | "RESTORE_ITEMS"           // 删除撤销:把刚删除的素材写回(Phase 5)
+
+// 注意:EXTRACT_VIDEO_INFO 与 DOWNLOAD_ITEM 已在代码中删除或未接线
 ```
 
 ### 4.4 Plasmo 配置
@@ -223,6 +232,51 @@ type MessageType =
 - [x] 笔记分组折叠视图
 - [x] 批量操作栏（全选/已选计数/批量下载）
 
+### Phase 5：popup UI 重设计 + 主题 token 统一（2026-06）✅ 已完成
+
+Phase 1-4 的 popup 仍然是基于「AuthorGroup → NoteGroup → MediaCard」三级折叠的列表式界面，信息密度高但缺乏 Apple Music 类的沉浸感；筛选/删除/键盘可达性等也有可优化空间。本期一次性合并以下工作：
+
+#### 5.1 视觉与品牌
+
+- 整体重设计为 **Apple Music 沉浸式深色**(Hero + 作者轮播 + 时间分节网格 + 浮动玻璃操作栏 + 大图预览)
+- 主题 token 抽取到 `popup-theme.ts`,严格对齐 `mockups/tokens.css`:
+  - 强调色从 `#ffffff` 改为 **Apple Action Blue `#0066cc`**(`accent` / `accentFocus` / `accentDark` / `accentLight`)
+  - 圆角从 6 档 (8/10/14/16/22/pill) 收齐为 5 档 (5/8/11/18/pill) 与 tokens.css 对齐
+  - 新增 `sp` (8pt 间距 7 档) / `btn` (按钮尺寸 4 档) / `fs` (字号 6 档) / `focus` (focus ring) / `xhs` (品牌红) / `douyin` (品牌 cyan) tokens
+- 平台 chip 激活态用平台品牌色:小红书 `#FF2442` / 抖音 `#25F4EE`
+- 顶栏加品牌 logo(双层叠片渐变 SVG)+ 字号对齐 Apple Type Scale
+
+#### 5.2 交互修复
+
+- **删除确认重构**:FloatBar 不再用「3 秒倒计时二次确认」(细红线在按钮底部,普通用户基本看不见),改为**立即删除 + 底部 Toast「已删除 N 项」+ 5 秒可撤销**。新增 `components/Toast.tsx` 通用 snackbar、`types.ts` 的 `RESTORE_ITEMS` 消息、`background/storage.ts` 的 `restoreItems()` 函数(按 id 去重,保留原始 `id` / `collectedAt`)。
+- **类型筛选改造**:平台筛选有「全部」+ 类型筛选也有「全部」造成认知冲突,改为 **2 图标 segmented control(📷 图片 / 🎬 视频)**,单击切换,重复激活取消选中回到「全部」。
+- **Hero 加快速操作**:Hero 右上角加「下载」「原帖」两个玻璃质感圆按钮,「下载」在图集上下载整组、在单图/视频上下载当前项;「原帖」打开 `sourceUrl`。
+- **搜索激活时折叠筛选区**:`searchOpen` 为 true 时 `filterRow` / `filterChip` 隐藏,聚焦搜索结果。
+
+#### 5.3 可访问性
+
+- 所有 icon-only 按钮加 `aria-label`(部分还加 `aria-pressed` 表达 toggle 态)
+- Hero / MediaCard 卡片区从 `<div onClick>` 改为 `role="button"` + `tabIndex={0}` + Enter/Space 键盘激活
+- 全局 `:focus-visible` 蓝色 ring 由 `injectPopupStyles()` 注入,Tab 键走过的元素都有可见焦点
+- MediaCard 加 `.mc-card-art` CSS 类:hover 上浮 + 阴影加深 / active 缩小,提供清晰的交互反馈
+
+#### 5.4 体验细节
+
+- AuthorCarousel 头像 coverUrl 加载时用渐变占位、加载完成淡入;失败回退稳定渐变色
+- FloatBar 0 选状态:圆圈改 dashed 描边 +「+」字符,文案改为「共 N 项,点击卡片选择」引导用户
+- 键盘快捷键:`Cmd/Ctrl+K` 切换搜索、`/` 打开搜索、`Esc` 关闭搜索(穿透到 PreviewModal)
+- Hero 高度自适应:从固定 16:9 改为 `aspectRatio: "16/9"` + `maxHeight: 180`,避免在大宽度下过高
+
+#### 5.5 教训沉淀
+
+详见 `LESSONS.md` 新增的「坑 11:popup 设计 token 必须单源」「坑 12:删除确认用时间倒计时是反人类设计」。
+
+#### 5.6 后续可选(P3 战略性)
+
+- `tokens.css` 完整迁移到 TypeScript module,实现 type-safe design system
+- axe-core 全面可访问性审计(WCAG 2.1 AA)
+- 主题支持(light theme + 跟随系统)
+
 ---
 
 ## 六、风险与缓解
@@ -266,10 +320,11 @@ type MessageType =
 
 | Phase | 内容 | 估时 | 状态 |
 |-------|------|------|------|
-| 1 | 架构重构（拆分 content / background / components） | 1天 | ✅ 已完成 |
-| 2 | 抖音无水印下载 + 批量下载 | 1.5天 | ⏸️ 暂缓（详见下文） |
+| 1 | 架构重构(拆分 content / background / components) | 1天 | ✅ 已完成 |
+| 2 | 抖音无水印下载 + 批量下载 | 1.5天 | ⏸️ 暂缓(详见下文) |
 | 3 | 小红书多图提取 + 笔记分组显示 | 1天 | ✅ 已完成 |
-| 4 | 弹窗增强（平台筛选、进度条、分组视图） | 0.5天 | ✅ 已完成 |
+| 4 | 弹窗增强(平台筛选、进度条、分组视图) | 0.5天 | ✅ 已完成 |
+| 5 | popup UI 重设计 + 主题 token 统一 + a11y | 持续 | ✅ 已完成 |
 
 ### Phase 2 暂缓说明
 
@@ -284,8 +339,9 @@ type MessageType =
 - 调研第三方无水印解析服务（合规风险高）
 - 接受限制，重点优化图片采集链路和批量下载体验
 
-### Phase 1-4 实施备注
+### Phase 1-5 实施备注
 
-- Phase 1 完成后 `DESIGN.md` 描述的 `content.ts` / `background.ts` 单文件结构已不存在，改为按平台拆分的 `contents/` 三文件 + `background/` 三模块
-- Phase 4 的"分组视图"实际实现为 **作者 → 笔记 → 图片卡片** 三层折叠（`AuthorGroup` 嵌入 `NoteGroup` 嵌入 `MediaCard`），不是单层笔记分组
-- `NoteGroup` 设计之初考虑为 popup 顶层独立组件，但实际更适合做嵌入式二级折叠（`embedded` 模式）
+- Phase 1 完成后 `DESIGN.md` 描述的 `content.ts` / `background.ts` 单文件结构已不存在，改为按平台拆分的 `contents/` + `background/` 模块
+- Phase 4 的"分组视图"最初实现为 **作者 → 笔记 → 图片卡片** 三层折叠(`AuthorGroup` 嵌入 `NoteGroup` 嵌入 `MediaCard`),Phase 5 重设计为 Apple Music 沉浸式深色界面,三级折叠已被 Hero + 作者轮播 + 时间分节网格取代
+- Phase 5 同时删除了 `BatchBar` / `NoteGroup` / `PlatformFilter` 三个组件,被 `FloatBar` / `AuthorCarousel` / 类型 segmented control 取代;新增 `Toast` 组件用于删除撤销和错误提示
+- 主题 token 唯一权威源在 `popup-theme.ts`,与 `mockups/tokens.css` 对齐(r/sp/btn/fs/focus/accent/xhs/douyin),组件禁止内联 magic value

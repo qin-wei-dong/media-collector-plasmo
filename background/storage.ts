@@ -115,3 +115,28 @@ export function removeItems(ids: string[]): Promise<void> {
     })
   )
 }
+
+/**
+ * 恢复一组已删除的素材(用于 Toast 撤销)。
+ * - 按 id 去重,保留原始 id / collectedAt 等元数据
+ * - 新恢复的项插入到列表最前(模拟"刚被删除又恢复"的时间顺序)
+ */
+export function restoreItems(items: MediaItem[]): Promise<{ success: boolean; restored: number }> {
+  if (!items.length) return Promise.resolve({ success: true, restored: 0 })
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getItems().then((existing) => {
+        const existingIds = new Set(existing.map((i) => i.id))
+        const toAdd = items.filter((item) => !existingIds.has(item.id))
+        const merged = [...toAdd, ...existing]
+        chrome.storage.local.set({ [STORAGE_KEY]: merged }, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+            return
+          }
+          resolve({ success: true, restored: toAdd.length })
+        })
+      }).catch(reject)
+    })
+  )
+}

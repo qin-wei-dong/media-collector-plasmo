@@ -9,18 +9,21 @@
 - **图集/视频自适应**：自动从 `__INITIAL_STATE__` 识别笔记类型，图集采全部图片，视频采视频流
 - **时间分节展示**：素材按「今天 / 昨天 / 本周 / 更早」分节，每节内按采集时间倒序
 - **作者轮播**：顶部横向作者头像列表，点击按作者筛选；"未分类"沉底
-- **Hero 大图**：最新采集的带封面素材置顶大图展示
+- **Hero 大图**：最新采集的带封面素材置顶大图展示，右上角带「下载」「原帖」两个快速操作
 - **大图预览**：点击素材查看大图，同一笔记的图片可左右切换
 
 ### 抖音采集
 - 悬停视频自动显示采集按钮，支持视频下载
 
 ### 通用功能
-- 平台筛选（全部 / 小红书 / 抖音）
-- 批量选择 + 批量下载（自动按笔记标题命名）
-- 右键菜单采集（图片/视频上右键 → "📥 采集此素材"）
-- 快捷键采集（`Ctrl/Cmd+Shift+S`）
-- 反防盗链：在后台 service worker 中 `fetch()` 携带平台 `Referer`，绕过 CDN 防盗链限制
+- **平台筛选**：全部 / 小红书 / 抖音,选中态用平台品牌色(小红书红 `#FF2442` / 抖音 cyan `#25F4EE`)
+- **类型筛选**：图标 segmented control(📷 图片 / 🎬 视频),单击切换
+- **批量选择 + 批量下载**(自动按笔记标题命名)
+- **删除 + 撤销**:点击垃圾桶立即删除,底部 Toast「已删除 N 项」5 秒内可点撤销
+- **键盘快捷键**:`Cmd/Ctrl+K` 或 `/` 打开搜索,`Esc` 关闭搜索/预览
+- **右键菜单采集**(图片/视频上右键 → "📥 采集此素材")
+- **快捷键采集**(`Ctrl/Cmd+Shift+S`)
+- **反防盗链**:在后台 service worker 中 `fetch()` 携带平台 `Referer`,绕过 CDN 防盗链限制
 
 ## 使用方法
 
@@ -68,35 +71,35 @@ pnpm package
 
 ```
 media-collector-plasmo/
-├── popup.tsx                  ← 弹窗主组件（Apple Music 风：时间分节 + 作者轮播）
-├── popup.html                 ← 弹窗容器（460px / 圆角 / 隐藏滚动条）
-├── popup-theme.ts             ← 主题 token + 作者头像渐变 + 时间分桶
-├── types.ts                   ← MediaItem / MessageType / 常量
+├── popup.tsx                  ← 弹窗主组件(Apple Music 风:时间分节 + 作者轮播 + Toast)
+├── popup.html                 ← 弹窗容器(460px / 圆角 / 隐藏滚动条)
+├── popup-theme.ts             ← 主题 token(r/sp/btn/fs/focus/accent/xhs/douyin) + 作者渐变 + 时间分桶
+├── types.ts                   ← MediaItem / MessageType / 常量(含 RESTORE_ITEMS)
 ├── package.json               ← manifest + 快捷键 + 依赖
 │
-├── contents/                  ← 内容脚本（按平台拆分）
-│   ├── xiaohongshu.ts         ← 小红书：ISOLATED world，请求注入 MAIN world + 启动浮层采集器
-│   └── douyin.ts              ← 抖音：hover 采集
+├── contents/                  ← 内容脚本(按平台拆分)
+│   ├── xiaohongshu.ts         ← 小红书:ISOLATED world,请求注入 MAIN world + 启动浮层采集器
+│   └── douyin.ts              ← 抖音:hover 采集
 │
-├── background/                ← 后台服务（service worker）
+├── background/                ← 后台服务(service worker)
 │   ├── index.ts               ← 消息路由 + executeScript 注入 MAIN world + 右键菜单 + 快捷键
-│   ├── storage.ts             ← chrome.storage.local CRUD（带写队列）
+│   ├── storage.ts             ← chrome.storage.local CRUD(带写队列)+ restoreItems 删除撤销
 │   └── download.ts            ← SW fetch + Referer + data URL 下载
 │
 ├── lib/
-│   ├── base.ts                 ← HoverUIManager（抖音用）/ 媒体检测 / Toast / 下载工具（部分遗留）
-│   ├── xhs-state-inject.ts     ← stateInjector()：被 background executeScript 注入 MAIN world
+│   ├── base.ts                 ← HoverUIManager(抖音用)/ 媒体检测 / Toast / 下载工具(部分遗留)
+│   ├── xhs-state-inject.ts     ← stateInjector():被 background executeScript 注入 MAIN world
 │   ├── xhs-detail-collector.ts ← 小红书浮层 DOM 检测 + 「采集素材」按钮跟随
-│   └── xhs-image-extractor.ts  ← 小红书笔记媒体提取（__mc_notes__ / __mc_state__ 两通路）
+│   └── xhs-image-extractor.ts  ← 小红书笔记媒体提取(__mc_notes__ / __mc_state__ 两通路)
 │
-├── components/                ← popup 用 React 组件（Apple Music 风）
-│   ├── Hero.tsx               ← 最新素材大图
-│   ├── AuthorCarousel.tsx     ← 作者头像横向轮播（点击筛选）
-│   ├── MediaCard.tsx          ← 单素材封面卡（点击预览，圆圈选中）
-│   ├── FloatBar.tsx           ← 浮动操作栏（全选 / 批量下载 / 删除）
-│   ├── PreviewModal.tsx       ← 大图预览（同笔记图片左右切换）
-│   ├── EmptyState.tsx         ← 空状态
-│   └── TimeSection.tsx        ← （当前未引用）
+├── components/                ← popup 用 React 组件(Apple Music 风)
+│   ├── Hero.tsx               ← 最新素材大图 + 快速操作(下载/原帖)
+│   ├── AuthorCarousel.tsx     ← 作者头像横向轮播(渐变占位 + coverUrl 淡入,点击筛选)
+│   ├── MediaCard.tsx          ← 单素材封面卡(点击预览,圆圈选中,hover/press 反馈)
+│   ├── FloatBar.tsx           ← 浮动操作栏(全选 / 批量下载 / 删除;0 选时 dashed 引导)
+│   ├── PreviewModal.tsx       ← 大图预览(同笔记图片左右切换 + 键盘 ← →)
+│   ├── EmptyState.tsx         ← 空状态(三步图示 + 快捷键提示)
+│   └── Toast.tsx              ← 底部 snackbar(删除撤销 / 错误提示共用)
 │
 └── AGENTS.md / CLAUDE.md / DESIGN.md / LESSONS.md
 ```
@@ -105,11 +108,12 @@ media-collector-plasmo/
 
 | Phase | 内容 | 状态 |
 |-------|------|------|
-| 1 | 架构重构（拆分 content / background / components） | ✅ 完成 |
+| 1 | 架构重构(拆分 content / background / components) | ✅ 完成 |
 | 2 | 抖音无水印下载 + 批量下载用户视频 | ⏸️ 暂缓 |
-| 收敛 | XHS 列表页 hover 采集整体移除，统一为详情页一键采集 | ✅ 完成 |
+| 收敛 | XHS 列表页 hover 采集整体移除,统一为详情页一键采集 | ✅ 完成 |
 | 3 | 小红书多图提取 + 笔记分组显示 | ✅ 完成 |
-| 4 | 弹窗增强（作者分组、平台筛选、批量操作） | ✅ 完成 |
+| 4 | 弹窗增强(作者分组、平台筛选、批量操作) | ✅ 完成 |
+| 5 | popup UI 重设计(Apple Music 风 + Toast 撤销 + a11y + 主题 token 统一) | ✅ 完成 |
 
 详细设计见 [DESIGN.md](./DESIGN.md)。
 

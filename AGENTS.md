@@ -36,19 +36,47 @@ contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + 
 
 ### Popup UI（Apple Music 风）
 
-`popup.tsx` 是 Apple Music 沉浸风深色 UI（不是旧的 `AuthorGroup → NoteGroup → MediaCard` 三级折叠，那些组件已删除）。主题 token 在 `popup-theme.ts`，容器在 `popup.html`。布局自顶向下：
+`popup.tsx` 是 Apple Music 沉浸风深色 UI（不是旧的 `AuthorGroup → NoteGroup → MediaCard` 三级折叠，那些组件已删除）。**主题 token 唯一权威源在 `popup-theme.ts`，所有组件必须用 `theme.*`，禁止内联 magic value。** Token 分组见 `mockups/tokens.css` + `popup-theme.ts`：
+
+| Token | 用途 | 档位 |
+|---|---|---|
+| `r` | 圆角 | xs(5) / sm(8) / md(11) / lg(18) / pill |
+| `sp` | 间距(8pt) | xxs / xs / sm / md / lg / xl / xxl |
+| `btn` | 按钮尺寸 | xs(22) / sm(30) / md(38) / lg(40) |
+| `fs` | 字号 | micro(11) → display(26) |
+| `accent` | Action Blue `#0066cc` | 选中态 / focus / 品牌强调 |
+| `xhs` / `douyin` | 平台品牌色 | 平台 chip 激活态 |
+
+布局自顶向下：
 
 ```
-顶栏（大标题"素材" + 计数 + 搜索）+ 搜索框 + 平台/类型筛选 chip + 作者筛选指示
-  → Hero（最新带封面素材大图）
-  → AuthorCarousel（作者头像横向轮播，点击按作者筛选）
-  → 时间分节网格（今天/昨天/本周/更早，popup-theme.ts 的 getTimeBucket）
-      └─ MediaCard（每桶内按 collectedAt 倒序）
-  → FloatBar（浮动操作栏：全选 / 批量下载 / 删除）
-  → PreviewModal（大图预览，同 noteId 兄弟图左右切换）
+顶栏（品牌 logo + "素材" + 数量角标 + 搜索按钮）
+  → [searchOpen] 搜索框（P1-2: 搜索时筛选行折叠）
+  → [not searchOpen] 筛选行:平台 chip(品牌色激活) + 类型 segmented control(📷/🎬)
+  → [authorFilter] 作者筛选指示 chip
+  → Hero(最新带封面素材大图,16:9 + maxHeight 180,右上角 下载/原帖 快速操作)
+  → 滚动区:
+      ├─ AuthorCarousel(圆形头像,渐变占位 + coverUrl 淡入)
+      └─ 时间分节网格(今天/昨天/本周/更早)
+          └─ MediaCard(.mc-card-art hover/press 反馈,1:1)
+  → FloatBar(浮动玻璃操作栏:全选 / 批量下载 / 删除;0 选时 dashed 描边引导)
+  → [undoToastVisible] Toast(底部 snackbar,5 秒「已删除 N 项」可撤销)
+  → [downloadError] Toast(底部 snackbar,自动消失)
+  → [previewItem] PreviewModal(全屏大图,左右切换 + 原帖链接)
+  → [空] EmptyState(三步图示 + 快捷键提示)
 ```
 
-数据聚合全在 `popup.tsx` 的 `useMemo` 里（heroItem / authors / noteImageCounts / filteredItems / timeBuckets）；`MediaItem._selected` 是 UI 态、不持久化。
+**关键交互(2026-06 更新):**
+
+- **删除流程**:FloatBar 点垃圾桶 → **立即删除** → 底部 Toast「已删除 N 项 撤销」(5 秒)。点击撤销通过 `RESTORE_ITEMS` 消息把原 `MediaItem[]` 写回 `chrome.storage.local`(`background/storage.ts` 的 `restoreItems()`,按 id 去重)。**不再使用**早期的"3 秒倒计时二次确认"机制。
+- **类型筛选** 是 2 图标 segmented control(📷 图片 / 🎬 视频),单选 toggle。修复了早期"全部"在平台 + 类型两组重复出现的 UX bug。
+- **键盘快捷键** (`popup.tsx` 顶层 effect):
+  - `Cmd/Ctrl+K` 切换搜索
+  - `/` (非输入态) 打开搜索
+  - `Esc` 关闭搜索;穿透到 PreviewModal 的 Esc 处理
+- **a11y**:所有 icon 按钮带 `aria-label`;Hero / MediaCard 卡片区是 `role="button"` + Tab 可达;全局 `:focus-visible` 蓝色 ring 由 `injectPopupStyles()` 注入。
+
+数据聚合全在 `popup.tsx` 的 `useMemo` 里(`heroItem` / `authors` / `noteImageCounts` / `filteredItems` / `timeBuckets`);`MediaItem._selected` 是 UI 态、不持久化。
 
 ## ⚠️ 采集模式:点开笔记即采集(不支持列表页 hover)
 
@@ -79,8 +107,9 @@ contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + 
 | `STORAGE_KEY` | `types.ts` | `chrome.storage.local` key for collected items |
 | `MEDIA_COLLECTOR_DIR` | `types.ts` | download subfolder name (`media-collector/`) |
 | `PLATFORM_LABELS` | `types.ts` | display labels for platforms |
-| `MessageType` | `types.ts` | string union of background message types |
+| `MessageType` | `types.ts` | string union of background message types (含 `RESTORE_ITEMS`) |
 | `MessagePayloads` | `types.ts` | per-message payload type map |
+| `theme` | `popup-theme.ts` | popup UI 主题 token 唯一权威源(参见上面 Popup UI 表格) |
 | `localStorage.__mc_state__` | `lib/xhs-state-inject.ts` | synced `__INITIAL_STATE__`（详情页 SSR，cross-world） |
 | `localStorage.__mc_notes__` | `lib/xhs-state-inject.ts` | fetch/XHR 拦截缓存的笔记媒体（首页浮层 CSR，LRU 上限 200） |
 

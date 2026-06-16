@@ -8,6 +8,7 @@ import { FloatBar } from "./components/FloatBar"
 import { EmptyState } from "./components/EmptyState"
 import { MediaCard } from "./components/MediaCard"
 import { PreviewModal } from "./components/PreviewModal"
+import { Toast } from "./components/Toast"
 
 // 注入全局样式:覆盖 Plasmo 默认 body 白底/margin,让 popup 整体深色透明
 function injectPopupStyles() {
@@ -19,6 +20,25 @@ function injectPopupStyles() {
     html, body { margin:0; padding:0; background:transparent; width:460px; height:100%; overflow:hidden; }
     #__plasmo { height:100%; overflow:hidden; background:transparent; border-radius:20px; }
     @keyframes mc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes mc-toast-in { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    /* P0-5: 全局 focus-visible,让键盘用户能看到焦点位置 */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid ${theme.accent};
+      outline-offset: 2px;
+      border-radius: ${theme.r.sm}px;
+    }
+    button:focus-visible, [role="button"]:focus-visible {
+      box-shadow: 0 0 0 2px ${theme.accent}, 0 0 0 4px rgba(0,102,204,0.3);
+      outline: none;
+    }
+    /* P2-2: MediaCard hover/press 反馈 */
+    .mc-card-art {
+      transition: transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1),
+                  box-shadow 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .mc-card-art:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 12px 28px rgba(0,0,0,0.55); }
+    .mc-card-art:active { transform: scale(0.97); }
   `
   document.head.appendChild(style)
 }
@@ -32,11 +52,50 @@ function Popup() {
   const [authorFilter, setAuthorFilter] = useState("")
   const [platformFilter, setPlatformFilter] = useState("")
   const [typeFilter, setTypeFilter] = useState("")
+  // P0-4: Toast 撤销 - 暂存刚删除的素材,5 秒内可点撤销
+  const [deletedBackup, setDeletedBackup] = useState<MediaItem[] | null>(null)
+  const [undoToastVisible, setUndoToastVisible] = useState(false)
 
   // 注入全局样式(覆盖 Plasmo 默认白底)
   useEffect(() => {
     injectPopupStyles()
   }, [])
+
+  // P2-5: 键盘快捷键
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // 忽略输入框内的快捷键
+      const tag = (e.target as HTMLElement)?.tagName
+      const isTyping = tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable
+
+      // Cmd/Ctrl + K → 切换搜索
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault()
+        setSearchOpen((s) => !s)
+        setSearchQuery("")
+        return
+      }
+
+      // / → 打开搜索(仅非输入态)
+      if (e.key === "/" && !isTyping && !searchOpen) {
+        e.preventDefault()
+        setSearchOpen(true)
+        return
+      }
+
+      // Escape → 关闭搜索或预览
+      if (e.key === "Escape") {
+        if (searchOpen) {
+          e.preventDefault()
+          setSearchOpen(false)
+          setSearchQuery("")
+        }
+        // PreviewModal 内部已自行处理 Escape
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [searchOpen])
 
   // 添加动画样式
   useEffect(() => {
@@ -46,10 +105,10 @@ function Popup() {
     style.id = styleId
     style.textContent = `
       @keyframes mc-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      @keyframes mc-progress { 
-        0% { transform: translateX(-100%); } 
-        50% { transform: translateX(100%); } 
-        100% { transform: translateX(-100%); } 
+      @keyframes mc-progress {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(100%); }
+        100% { transform: translateX(-100%); }
       }
     `
     document.head.appendChild(style)
@@ -221,6 +280,27 @@ function Popup() {
     )
   }
 
+  // P1-1: Hero 直接下载(单图/视频则下载这一项,图集则下载整组)
+  const downloadHeroItems = (targets: MediaItem[]) => {
+    if (!targets.length) return
+    setDownloadError("")
+    chrome.runtime.sendMessage(
+      {
+        type: "BATCH_DOWNLOAD",
+        payload: targets.map((i) => ({
+          url: i.url,
+          filename: buildFilename(i),
+          platform: i.platform,
+        })),
+      },
+      (resp) => {
+        if (!resp?.success) {
+          setDownloadError(resp?.errors?.[0] || "下载失败,请确保打开了小红书/抖音页面")
+        }
+      }
+    )
+  }
+
   // 全选/取消全选当前筛选结果
   const toggleSelectAll = () => {
     const filteredIds = new Set(filteredItems.map((i) => i.id))
@@ -234,12 +314,22 @@ function Popup() {
     )
   }
 
-  // 删除:逐条发送 REMOVE_ITEMS 到 background,走 enqueueWrite 原子删
+  // 删除:备份当前选中的素材 → 发送 REMOVE_ITEMS → 显示 Toast 撤销入口
   const removeSelected = () => {
-    const ids = items.filter((i) => i._selected).map((i) => i.id)
+    const selectedItems = items.filter((i) => i._selected)
+    if (!selectedItems.length) return
+    const ids = selectedItems.map((i) => i.id)
+
+    // 先备份,Toast 撤销时使用
+    setDeletedBackup(selectedItems.map(({ _selected, ...rest }) => rest))
+    setUndoToastVisible(true)
+
     chrome.runtime.sendMessage({ type: "REMOVE_ITEMS", payload: ids }, () => {
       if (chrome.runtime.lastError) {
         console.error("[Popup] 删除失败", chrome.runtime.lastError)
+        // 删除失败:回滚 toast
+        setUndoToastVisible(false)
+        setDeletedBackup(null)
       }
       // 重新拉取最新数据并判断是否需要清除作者筛选
       chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (resp) => {
@@ -255,6 +345,26 @@ function Popup() {
         }
       })
     })
+  }
+
+  // 撤销删除:发送 RESTORE_ITEMS,background 把素材插回原位
+  const undoDelete = () => {
+    if (!deletedBackup || !deletedBackup.length) return
+    const itemsToRestore = deletedBackup
+    setDeletedBackup(null)
+    chrome.runtime.sendMessage(
+      { type: "RESTORE_ITEMS", payload: itemsToRestore },
+      (resp) => {
+        if (chrome.runtime.lastError) {
+          console.error("[Popup] 撤销失败", chrome.runtime.lastError)
+          return
+        }
+        // 重新拉取最新数据
+        chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (r) => {
+          if (r?.items) setItems(r.items)
+        })
+      }
+    )
   }
 
   if (items.length === 0) {
@@ -277,20 +387,49 @@ function Popup() {
       <div style={styles.content}>
         {/* 顶栏 */}
         <div style={styles.navbar}>
-          <div>
+          <div style={styles.brand}>
+            {/* P2-1: 品牌 logo(双层叠片,代表"素材集合") */}
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 22 22"
+              fill="none"
+              aria-hidden="true"
+              style={styles.logo}
+            >
+              <defs>
+                <linearGradient id="mc-logo-grad" x1="0" y1="0" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#5AC8FA" />
+                  <stop offset="100%" stopColor="#0066cc" />
+                </linearGradient>
+              </defs>
+              <rect x="3" y="9" width="13" height="10" rx="2.5" fill="url(#mc-logo-grad)" opacity="0.55" />
+              <rect x="6" y="3" width="13" height="10" rx="2.5" fill="url(#mc-logo-grad)" />
+            </svg>
             <span style={styles.largetitle}>素材</span>
-            <span style={styles.countBadge}>{items.length}</span>
+            <span style={styles.countBadge} aria-label={`共 ${items.length} 项素材`}>{items.length}</span>
           </div>
           <div style={styles.tools}>
             <div
               style={{ ...styles.tool, ...(searchOpen ? styles.toolActive : {}) }}
-              title="搜索"
+              title="搜索 (Cmd+K)"
+              role="button"
+              tabIndex={0}
+              aria-label={searchOpen ? "关闭搜索" : "打开搜索"}
+              aria-pressed={searchOpen}
               onClick={() => {
                 setSearchOpen(!searchOpen)
                 setSearchQuery("")
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault()
+                  setSearchOpen(!searchOpen)
+                  setSearchQuery("")
+                }
+              }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
                 <circle cx="11" cy="11" r="7" />
                 <path d="m21 21-4.3-4.3" />
               </svg>
@@ -301,7 +440,7 @@ function Popup() {
         {/* 搜索框 */}
         {searchOpen && (
           <div style={styles.searchWrap}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={styles.searchIcon}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={styles.searchIcon} aria-hidden="true">
               <circle cx="11" cy="11" r="7" />
               <path d="m21 21-4.3-4.3" />
             </svg>
@@ -311,10 +450,24 @@ function Popup() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
+              aria-label="搜索素材"
+              role="searchbox"
             />
             {searchQuery && (
-              <div style={styles.searchClear} onClick={() => setSearchQuery("")}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <div
+                style={styles.searchClear}
+                role="button"
+                tabIndex={0}
+                aria-label="清除搜索"
+                onClick={() => setSearchQuery("")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault()
+                    setSearchQuery("")
+                  }
+                }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
                   <line x1="18" y1="6" x2="6" y2="18" />
                   <line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
@@ -323,59 +476,125 @@ function Popup() {
           </div>
         )}
 
-        {/* 筛选标签:平台 + 类型 */}
-        <div style={styles.filterRow}>
-          {[
-            { key: "", label: "全部" },
-            { key: "xiaohongshu", label: "小红书" },
-            { key: "douyin", label: "抖音" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              style={{
-                ...styles.filterBtn,
-                ...(platformFilter === f.key ? styles.filterBtnActive : {}),
-              }}
-              onClick={() => setPlatformFilter(platformFilter === f.key ? "" : f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-          <div style={styles.filterDivider} />
-          {[
-            { key: "", label: "全部" },
-            { key: "image", label: "图片" },
-            { key: "video", label: "视频" },
-          ].map((f) => (
-            <button
-              key={f.key}
-              style={{
-                ...styles.filterBtn,
-                ...(typeFilter === f.key ? styles.filterBtnActive : {}),
-              }}
-              onClick={() => setTypeFilter(typeFilter === f.key ? "" : f.key)}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* 作者筛选指示器 */}
-        {authorFilter && (
-          <div style={styles.filterChip}>
-            <span style={styles.filterChipText}>作者: {authorFilter || "未分类"}</span>
-            <div style={styles.filterChipClear} onClick={() => setAuthorFilter("")}>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
+        {/* P1-2: 搜索激活时折叠筛选区,聚焦搜索结果 */}
+        {!searchOpen && (
+          <>
+            {/* 筛选标签:平台 + 类型(图标式 segmented control,避免"全部"重复) */}
+            <div style={styles.filterRow}>
+              {/* 平台 chip - 激活态用对应平台品牌色 */}
+              {[
+                { key: "", label: "全部", color: theme.accent, bg: theme.accent + "29" },
+                { key: "xiaohongshu", label: "小红书", color: theme.xhs, bg: theme.xhsBg },
+                { key: "douyin", label: "抖音", color: theme.douyin, bg: theme.douyinBg },
+              ].map((f) => {
+                const isActive = platformFilter === f.key
+                return (
+                  <button
+                    key={f.key}
+                    style={{
+                      ...styles.filterBtn,
+                      ...(isActive
+                        ? {
+                            background: f.bg,
+                            color: f.color,
+                            fontWeight: 600,
+                            borderColor: f.color + "55",
+                          }
+                        : {}),
+                    }}
+                    onClick={() => setPlatformFilter(platformFilter === f.key ? "" : f.key)}
+                    aria-pressed={isActive}
+                  >
+                    {f.label}
+                  </button>
+                )
+              })}
+              <div style={styles.filterDivider} />
+              {/* 类型 segmented control:点击同一项取消选中(回到"全部") */}
+              <div style={styles.typeSegment} role="group" aria-label="按类型筛选">
+                <button
+                  style={{
+                    ...styles.typeBtn,
+                    ...(typeFilter === "image" ? styles.typeBtnActive : {}),
+                  }}
+                  onClick={() => setTypeFilter(typeFilter === "image" ? "" : "image")}
+                  aria-label="只看图片"
+                  aria-pressed={typeFilter === "image"}
+                  title="图片"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <rect x="3" y="3" width="18" height="18" rx="3" />
+                    <circle cx="9" cy="9" r="1.5" />
+                    <path d="m21 15-5-5L5 21" />
+                  </svg>
+                </button>
+                <button
+                  style={{
+                    ...styles.typeBtn,
+                    ...(typeFilter === "video" ? styles.typeBtnActive : {}),
+                  }}
+                  onClick={() => setTypeFilter(typeFilter === "video" ? "" : "video")}
+                  aria-label="只看视频"
+                  aria-pressed={typeFilter === "video"}
+                  title="视频"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <polygon points="6 4 20 12 6 20" />
+                  </svg>
+                </button>
+              </div>
             </div>
-          </div>
+
+            {/* 作者筛选指示器 */}
+            {authorFilter && (
+              <div style={styles.filterChip}>
+                <span style={styles.filterChipText}>作者: {authorFilter || "未分类"}</span>
+                <div
+                  style={styles.filterChipClear}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="清除作者筛选"
+                  onClick={() => setAuthorFilter("")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      setAuthorFilter("")
+                    }
+                  }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Hero */}
         {heroItem && (
-          <Hero item={heroItem} count={heroImageCount ?? 1} onClick={() => openPreview(heroItem!)} />
+          <Hero
+            item={heroItem}
+            count={heroImageCount ?? 1}
+            onClick={() => openPreview(heroItem!)}
+            onDownload={(e) => {
+              e.stopPropagation()
+              // 图集:下载整组;单图/视频:仅下载这一项
+              const targets = heroItem!.noteId
+                ? items.filter((i) => i.noteId === heroItem!.noteId)
+                : [heroItem!]
+              downloadHeroItems(targets)
+            }}
+            onOpenSource={(e) => {
+              e.stopPropagation()
+              if (heroItem!.sourceUrl) {
+                try {
+                  chrome.tabs.create({ url: heroItem!.sourceUrl, active: false })
+                } catch {}
+              }
+            }}
+          />
         )}
 
         {/* 滚动区 */}
@@ -421,11 +640,27 @@ function Popup() {
           />
         )}
 
+        {/* P0-4: 删除撤销 Toast(底部 snackbar,5 秒内可点撤销) */}
+        {undoToastVisible && deletedBackup && (
+          <Toast
+            message={`已删除 ${deletedBackup.length} 项`}
+            actionLabel="撤销"
+            onAction={undoDelete}
+            duration={5000}
+            onDismiss={() => {
+              setUndoToastVisible(false)
+              setDeletedBackup(null)
+            }}
+          />
+        )}
+
         {/* 下载错误提示 */}
         {downloadError && (
-          <div style={styles.errorToast} onClick={() => setDownloadError("")}>
-            {downloadError}
-          </div>
+          <Toast
+            message={downloadError}
+            duration={4000}
+            onDismiss={() => setDownloadError("")}
+          />
         )}
 
         {/* 大图预览 */}
@@ -461,7 +696,7 @@ const styles: Record<string, React.CSSProperties> = {
     background:
       "radial-gradient(ellipse 70% 45% at 30% 0%, rgba(255,90,95,0.22), transparent 60%)," +
       "radial-gradient(ellipse 65% 55% at 85% 25%, rgba(120,80,255,0.18), transparent 55%)," +
-      "linear-gradient(180deg, #0a0a0c 0%, #1c1c1e 100%)",
+      `linear-gradient(180deg, ${theme.bg} 0%, ${theme.bgGradient} 100%)`,
   },
   content: {
     position: "absolute",
@@ -473,31 +708,40 @@ const styles: Record<string, React.CSSProperties> = {
   },
   navbar: {
     flexShrink: 0,
-    padding: "14px 16px 10px",
+    padding: `14px ${theme.sp.md}px ${theme.sp.sm - 2}px`,
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
   },
+  brand: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.sp.xs + 2, // 10px
+  },
+  logo: {
+    flexShrink: 0,
+    filter: "drop-shadow(0 2px 6px rgba(0,102,204,0.35))",
+  },
   largetitle: {
-    fontSize: 26,
+    fontSize: theme.fs.display,
     fontWeight: 700,
     letterSpacing: "-0.5px",
   },
   countBadge: {
-    fontSize: 11,
+    fontSize: theme.fs.micro,
     fontWeight: 600,
     color: theme.textSecondary,
     background: theme.card,
     padding: "2px 8px",
-    borderRadius: 8,
+    borderRadius: theme.r.sm,
     marginLeft: 6,
     verticalAlign: "middle",
   },
   tools: { display: "flex", gap: 6 },
   tool: {
-    width: 30,
-    height: 30,
-    borderRadius: "50%",
+    width: theme.btn.sm,
+    height: theme.btn.sm,
+    borderRadius: theme.r.pill,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
@@ -506,20 +750,21 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.card,
     backdropFilter: theme.glassBlur,
     WebkitBackdropFilter: theme.glassBlur,
+    transition: `all ${theme.durFast} ${theme.easeOut}`,
   },
-  gridSection: { padding: "0 16px 14px" },
+  gridSection: { padding: `0 ${theme.sp.md}px ${theme.sp.sm + 2}px` },
   gridHead: {
     display: "flex",
     alignItems: "baseline",
     justifyContent: "space-between",
-    paddingBottom: 8,
+    paddingBottom: theme.sp.xs,
   },
-  gridTitle: { fontSize: 17, fontWeight: 700, letterSpacing: "-0.3px", color: theme.textPrimary },
-  gridCount: { fontSize: 12, color: theme.textTertiary, fontWeight: 500 },
+  gridTitle: { fontSize: theme.fs.title, fontWeight: 700, letterSpacing: "-0.3px", color: theme.textPrimary },
+  gridCount: { fontSize: theme.fs.caption, color: theme.textTertiary, fontWeight: 500 },
   gridWrap: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-    gap: 12,
+    gap: theme.sp.sm,
   },
   scrollArea: {
     flex: 1,
@@ -530,16 +775,16 @@ const styles: Record<string, React.CSSProperties> = {
   },
   toolActive: {
     background: theme.accent,
-    color: "#000",
+    color: "#fff",
   },
   searchWrap: {
     display: "flex",
     alignItems: "center",
-    gap: 8,
-    margin: "0 16px 10px",
-    padding: "7px 12px",
+    gap: theme.sp.xs,
+    margin: `0 ${theme.sp.md}px ${theme.sp.sm - 2}px`,
+    padding: `7px ${theme.sp.sm}px`,
     background: theme.card,
-    borderRadius: 8,
+    borderRadius: theme.r.sm,
   },
   searchIcon: {
     color: theme.textTertiary,
@@ -551,7 +796,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: "transparent",
     outline: "none",
     color: theme.textPrimary,
-    fontSize: 15,
+    fontSize: theme.fs.bodyLg,
     fontFamily: "inherit",
   },
   searchClear: {
@@ -568,28 +813,26 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: 6,
-    margin: "0 16px 8px",
+    margin: `0 ${theme.sp.md}px ${theme.sp.xs}px`,
     flexWrap: "wrap",
   },
   filterBtn: {
     border: "1px solid transparent",
     background: theme.card,
     color: theme.textSecondary,
-    fontSize: 11,
+    fontSize: theme.fs.micro + 2, // 13px,提升可读性
     fontWeight: 500,
     padding: "4px 10px",
-    borderRadius: 12,
+    borderRadius: theme.r.sm,
     cursor: "pointer",
     transition: `all ${theme.durFast} ${theme.easeOut}`,
     fontFamily: "inherit",
   },
   filterBtnActive: {
-    background: "rgba(255,255,255,0.18)",
+    background: theme.accent,
     color: "#fff",
     fontWeight: 600,
-    borderColor: "rgba(255,255,255,0.35)",
-    boxShadow: "0 0 12px rgba(255,255,255,0.08)",
-    transform: "scale(1.02)",
+    borderColor: theme.accent,
   },
   filterDivider: {
     width: 1,
@@ -597,15 +840,40 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.hairline,
     margin: "0 2px",
   },
+  // 类型 segmented control(图标)
+  typeSegment: {
+    display: "inline-flex",
+    background: theme.card,
+    borderRadius: theme.r.sm,
+    padding: 2,
+    gap: 2,
+  },
+  typeBtn: {
+    width: 26,
+    height: 22,
+    border: "none",
+    background: "transparent",
+    color: theme.textSecondary,
+    cursor: "pointer",
+    borderRadius: theme.r.xs,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: `all ${theme.durFast} ${theme.easeOut}`,
+  },
+  typeBtnActive: {
+    background: theme.accent,
+    color: "#fff",
+  },
   filterChip: {
     display: "inline-flex",
     alignItems: "center",
-    gap: 8,
-    margin: "0 20px 8px",
-    padding: "6px 12px",
+    gap: theme.sp.xs,
+    margin: `0 20px ${theme.sp.xs}px`,
+    padding: `6px ${theme.sp.sm}px`,
     background: "rgba(255,255,255,0.12)",
-    borderRadius: 16,
-    fontSize: 12,
+    borderRadius: theme.r.lg,
+    fontSize: theme.fs.caption,
     fontWeight: 500,
     color: theme.textSecondary,
     alignSelf: "flex-start",
@@ -621,22 +889,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: theme.textTertiary,
     width: 16,
     height: 16,
-  },
-  errorToast: {
-    position: "absolute",
-    bottom: 72,
-    left: 14,
-    right: 14,
-    background: "rgba(255,69,58,0.9)",
-    backdropFilter: "blur(20px)",
-    WebkitBackdropFilter: "blur(20px)",
-    color: "#fff",
-    fontSize: 13,
-    padding: "10px 14px",
-    borderRadius: 12,
-    zIndex: 11,
-    cursor: "pointer",
-    textAlign: "center",
   },
 }
 

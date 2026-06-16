@@ -1,6 +1,6 @@
 // background/index.ts — 消息路由 + 安装初始化
 import { type MediaItem, type MessageType, type MessagePayloads, STORAGE_KEY } from "../types"
-import { getItems, saveItem, saveItems, clearItems, removeItems } from "./storage"
+import { getItems, saveItem, saveItems, clearItems, removeItems, restoreItems } from "./storage"
 import { batchDownload } from "./download"
 import { stateInjector } from "../lib/xhs-state-inject"
 
@@ -162,6 +162,14 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
     case "REMOVE_ITEMS": {
       const ids = message.payload as string[]
       removeItems(ids).then(() => sendResponse({ success: true }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "RESTORE_ITEMS": {
+      // Toast 撤销:把刚删除的素材插回列表(按 id 去重,保留原始 id/时间戳)
+      const items = message.payload as MediaItem[]
+      restoreItems(items).then((result) => sendResponse(result))
         .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
     }
