@@ -142,7 +142,9 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
     }
 
     case "GET_ITEMS":
-      getItems().then((items) => sendResponse({ success: true, items }))
+      getItems()
+        .then((items) => sendResponse({ success: true, items }))
+        .catch((e) => sendResponse({ success: false, error: String(e), items: [] }))
       return true
 
     case "GET_COLLECTIONS":
@@ -174,7 +176,9 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
     }
 
     case "CLEAR_ITEMS":
-      clearItems().then(() => sendResponse({ success: true }))
+      clearItems()
+        .then(() => sendResponse({ success: true }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
 
     case "REMOVE_ITEMS": {
@@ -233,7 +237,9 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
     }
 
     case "BATCH_DOWNLOAD":
-      batchDownload(message.payload as MessagePayloads["BATCH_DOWNLOAD"]).then((result) => sendResponse(result))
+      batchDownload(message.payload as MessagePayloads["BATCH_DOWNLOAD"])
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, errors: [String(e)] }))
       return true
 
     case "SHOW_DOWNLOADS_FOLDER": {
@@ -288,12 +294,17 @@ function collectAndNotify(
     coverUrl: mediaData.coverUrl,
   }
 
-  saveItem(newItem).then((result) => {
-    if (result.success) {
-      showNote("✅ 采集成功", mediaData.title || "素材已添加")
-    } else {
-      showNote("已存在", "该素材已在采集列表中")
-    }
-    callback?.({ success: result.success, error: result.error, item: newItem })
-  })
+  saveItem(newItem)
+    .then((result) => {
+      if (result.success) {
+        showNote("✅ 采集成功", mediaData.title || "素材已添加")
+      } else {
+        showNote("已存在", "该素材已在采集列表中")
+      }
+      callback?.({ success: result.success, error: result.error, item: newItem })
+    })
+    .catch((err) => {
+      // storage 写入失败:必须回调,否则调用方(采集按钮)永久 loading
+      callback?.({ success: false, error: String(err) })
+    })
 }

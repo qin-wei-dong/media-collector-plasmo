@@ -181,13 +181,33 @@ function LibraryPage() {
 
   const loadItems = useCallback(() => {
     chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (resp) => {
-      if (resp?.items) setItems(resp.items)
+      const err = chrome.runtime.lastError
+      if (err || !resp) {
+        console.warn("[Library] GET_ITEMS 失败,重试:", err?.message)
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (r2) => {
+            if (r2?.items) setItems(r2.items)
+          })
+        }, 300)
+        return
+      }
+      if (resp.items) setItems(resp.items)
     })
   }, [])
 
   const loadCollections = useCallback(() => {
     chrome.runtime.sendMessage({ type: "GET_COLLECTIONS" }, (resp) => {
-      if (resp?.collections) setCollections(resp.collections)
+      const err = chrome.runtime.lastError
+      if (err || !resp) {
+        console.warn("[Library] GET_COLLECTIONS 失败,重试:", err?.message)
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: "GET_COLLECTIONS" }, (r2) => {
+            if (r2?.collections) setCollections(r2.collections)
+          })
+        }, 300)
+        return
+      }
+      if (resp.collections) setCollections(resp.collections)
     })
   }, [])
 

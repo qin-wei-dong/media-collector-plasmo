@@ -127,7 +127,18 @@ function Popup() {
 
   const loadItems = useCallback(() => {
     chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (resp) => {
-      if (resp?.items) setItems(resp.items)
+      const err = chrome.runtime.lastError
+      if (err || !resp) {
+        // SW 休眠/重启:lastError 非空或 resp undefined,重试 1 次
+        console.warn("[Popup] GET_ITEMS 失败,重试:", err?.message)
+        setTimeout(() => {
+          chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (r2) => {
+            if (r2?.items) setItems(r2.items)
+          })
+        }, 300)
+        return
+      }
+      if (resp.items) setItems(resp.items)
     })
   }, [])
 
