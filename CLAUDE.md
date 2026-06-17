@@ -197,3 +197,12 @@ Strict mode, ESNext target, bundler module resolution. `types.ts` holds the shar
 - **`DESIGN.md` / `LESSONS.md`** — design rationale and the running log of lessons learned (why things are the way they are).
 
 All three describe the same current architecture: MAIN-world `executeScript` injection, the Apple Music-style popup, and the background-service-worker download path. When you change architecture, update all three — they drifted out of sync once before (a deleted `xiaohongshu-state.ts`, the old `AuthorGroup → NoteGroup → MediaCard` popup, `document_idle`) and it caused confusion.
+
+## Verification commands (M5+)
+
+```bash
+pnpm build            # Plasmo build,必须成功
+pnpm audit:a11y       # axe-core a11y 审计(目前仅覆盖 popup)
+```
+
+M5 阶段引入了 `tabs/library.tsx` 全屏素材库 + a11y/视觉/响应式收口。完整验收清单见 `docs/superpowers/plans/2026-06-17-m5-stability-polish-implementation.md` 第 6 节。

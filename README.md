@@ -124,6 +124,7 @@ media-collector-plasmo/
 | M2 | 全屏素材库 `tabs/library.tsx` | ✅ 完成 |
 | M3 | 收藏夹(Collections)+ `background/collections.ts` 独立模块 | ✅ 完成 |
 | M4 | 分文件夹导出 + 导出反馈 Toast + 「本周已导出」看板 | ✅ 完成 |
+| M5 | 稳定性与体验打磨(批量选择安全 / 导出文案 / 空状态 / a11y / 视觉一致性 / 响应式) | ✅ 完成 |
 
 详细设计见 [DESIGN.md](./DESIGN.md)。
 

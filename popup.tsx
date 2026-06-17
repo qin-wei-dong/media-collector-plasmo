@@ -854,7 +854,7 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     background: theme.card,
     color: theme.textSecondary,
     fontSize: theme.fs.micro + 2, // 13px,提升可读性
-    fontWeight: 500,
+    fontWeight: 600, // M5 Task 5:按钮类用 600(plan 规则)
     padding: "5px 12px",
     borderRadius: theme.r.pill, // 对齐原型:胶囊 chip
     cursor: "pointer",
