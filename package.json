@@ -2,7 +2,7 @@
   "name": "media-collector-plasmo",
   "displayName": "素材采集助手",
   "version": "2.1.0",
-  "description": "一键采集小红书、抖音的图片和视频素材",
+  "description": "一键采集小红书笔记图片和视频素材",
   "scripts": {
     "dev": "plasmo dev",
     "build": "plasmo build",
@@ -25,8 +25,7 @@
   "manifest": {
     "action": {},
     "host_permissions": [
-      "https://www.xiaohongshu.com/*",
-      "https://www.douyin.com/*"
+      "https://www.xiaohongshu.com/*"
     ],
     "permissions": [
       "storage",
@@ -43,7 +42,7 @@
           "default": "Ctrl+Shift+S",
           "mac": "Command+Shift+S"
         },
-        "description": "采集鼠标悬停的素材"
+        "description": "采集当前小红书笔记素材"
       }
     }
   }
