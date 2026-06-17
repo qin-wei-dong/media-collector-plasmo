@@ -240,3 +240,115 @@ export function unassignCollection(itemIds: string[], collectionId: string): Pro
     })
   )
 }
+
+// M6 Task 5:改颜色
+export function updateCollectionColor(id: string, color: string): Promise<{ success: boolean; error?: string }> {
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getCollections()
+        .then((collections) => {
+          if (!collections.some((c) => c.id === id)) {
+            resolve({ success: false, error: "收藏夹不存在" })
+            return
+          }
+          const next = collections.map((c) =>
+            c.id === id ? { ...c, color, updatedAt: new Date().toISOString() } : c
+          )
+          setCollections(next)
+            .then(() => resolve({ success: true }))
+            .catch(reject)
+        })
+        .catch(reject)
+    })
+  )
+}
+
+// M6 Task 5:置顶/取消置顶
+export function setCollectionPinned(id: string, pinned: boolean): Promise<{ success: boolean; error?: string }> {
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getCollections()
+        .then((collections) => {
+          if (!collections.some((c) => c.id === id)) {
+            resolve({ success: false, error: "收藏夹不存在" })
+            return
+          }
+          const next = collections.map((c) =>
+            c.id === id ? { ...c, pinned, updatedAt: new Date().toISOString() } : c
+          )
+          setCollections(next)
+            .then(() => resolve({ success: true }))
+            .catch(reject)
+        })
+        .catch(reject)
+    })
+  )
+}
+
+// M6 Task 5:重排(用户拖拽后调用)
+export function reorderCollections(orderedIds: string[]): Promise<{ success: boolean; error?: string }> {
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getCollections()
+        .then((collections) => {
+          if (orderedIds.length !== collections.length) {
+            resolve({ success: false, error: "排序列表与当前数量不一致" })
+            return
+          }
+          const idSet = new Set(orderedIds)
+          if (!collections.every((c) => idSet.has(c.id))) {
+            resolve({ success: false, error: "排序列表包含未知 id" })
+            return
+          }
+          const orderMap = new Map(orderedIds.map((id, i) => [id, i]))
+          const next = collections.map((c) => ({ ...c, sortOrder: orderMap.get(c.id) ?? 0 }))
+          setCollections(next)
+            .then(() => resolve({ success: true }))
+            .catch(reject)
+        })
+        .catch(reject)
+    })
+  )
+}
+
+// M6 Task 5:批量移动(从 fromCollectionId 移除,加入 toCollectionId)
+export function moveCollectionItems(
+  itemIds: string[],
+  fromCollectionId: string,
+  toCollectionId: string
+): Promise<{ success: boolean; error?: string; movedCount?: number }> {
+  if (!itemIds.length) return Promise.resolve({ success: true, movedCount: 0 })
+  if (fromCollectionId === toCollectionId) {
+    return Promise.resolve({ success: false, error: "源收藏夹与目标收藏夹相同" })
+  }
+
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      Promise.all([getCollections(), getItems()])
+        .then(([collections, items]) => {
+          if (!collections.some((c) => c.id === fromCollectionId)) {
+            resolve({ success: false, error: "源收藏夹不存在" })
+            return
+          }
+          if (!collections.some((c) => c.id === toCollectionId)) {
+            resolve({ success: false, error: "目标收藏夹不存在" })
+            return
+          }
+          const idSet = new Set(itemIds)
+          let movedCount = 0
+          const nextItems = items.map((item) => {
+            if (!idSet.has(item.id) || !item.collectionIds?.length) return item
+            if (!item.collectionIds.includes(fromCollectionId)) return item
+            const nextIds = item.collectionIds.filter((id) => id !== fromCollectionId)
+            nextIds.push(toCollectionId)
+            movedCount += 1
+            return { ...item, collectionIds: nextIds }
+          })
+          setItems(nextItems)
+            .then(() => resolve({ success: true, movedCount }))
+            .catch(reject)
+        })
+        .catch(reject)
+    })
+  )
+}

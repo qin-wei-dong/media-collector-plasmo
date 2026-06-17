@@ -7,8 +7,12 @@ import {
   deleteCollection,
   ensureCollectionsInitialized,
   listCollections,
+  moveCollectionItems,
+  reorderCollections,
   renameCollection,
+  setCollectionPinned,
   unassignCollection,
+  updateCollectionColor,
 } from "./collections"
 import { batchDownload } from "./download"
 import { stateInjector } from "../lib/xhs-state-inject"
@@ -231,6 +235,38 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
     case "UNASSIGN_COLLECTION": {
       const payload = message.payload as MessagePayloads["UNASSIGN_COLLECTION"]
       unassignCollection(payload.itemIds, payload.collectionId)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "UPDATE_COLLECTION_COLOR": {
+      const payload = message.payload as MessagePayloads["UPDATE_COLLECTION_COLOR"]
+      updateCollectionColor(payload.id, payload.color)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "REORDER_COLLECTIONS": {
+      const payload = message.payload as MessagePayloads["REORDER_COLLECTIONS"]
+      reorderCollections(payload.orderedIds)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "PIN_COLLECTION": {
+      const payload = message.payload as MessagePayloads["PIN_COLLECTION"]
+      setCollectionPinned(payload.id, payload.pinned)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "MOVE_COLLECTION_ITEMS": {
+      const payload = message.payload as MessagePayloads["MOVE_COLLECTION_ITEMS"]
+      moveCollectionItems(payload.itemIds, payload.fromCollectionId, payload.toCollectionId)
         .then((result) => sendResponse(result))
         .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
