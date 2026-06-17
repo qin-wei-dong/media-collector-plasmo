@@ -11,6 +11,7 @@
 //   3. 刷新库页
 
 const count = parseInt(process.argv[2] || "100", 10)
+const isJson = process.argv.includes("--json")
 
 // 真实感的作者名和标题模板
 const XHS_AUTHORS = ["老王摄影", "美食日记", "设计灵感库", "旅行手记", "日常穿搭", "家居美学", "咖啡探店"]
@@ -130,11 +131,17 @@ for (let i = 0; i < count; i++) {
 }
 
 // 输出:items JSON + 注入命令 + collections 注入命令
-console.log("// ===== 素材数据(" + count + " 条)=====")
-console.log("// 复制下面两行到 Service Worker DevTools Console 执行:\n")
-console.log("chrome.storage.local.set({ collected_media: " + JSON.stringify(items, null, 0) + " })")
-console.log("chrome.storage.local.set({ collections: " + JSON.stringify(collections, null, 0) + " })")
-console.log("\n// 执行后刷新库页(popup 或 library tab)即可看到样本数据。")
+if (isJson) {
+  // --json 模式:输出纯 JSON,供 fetch + r.json() 注入用
+  console.log(JSON.stringify({ items, collections }))
+} else {
+  // 默认:输出可粘贴 DevTools 的 JS 脚本(带注释)
+  console.log("// ===== 素材数据(" + count + " 条)=====")
+  console.log("// 复制下面两行到 Service Worker DevTools Console 执行:\n")
+  console.log("chrome.storage.local.set({ collected_media: " + JSON.stringify(items, null, 0) + " })")
+  console.log("chrome.storage.local.set({ collections: " + JSON.stringify(collections, null, 0) + " })")
+  console.log("\n// 执行后刷新库页(popup 或 library tab)即可看到样本数据。")
+}
 
 // stderr 输出统计信息(不干扰 stdout 的 JSON)
 console.error(`生成完成: ${items.length} 条素材`)
