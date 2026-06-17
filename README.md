@@ -1,5 +1,7 @@
 # 素材采集助手
 
+**当前版本: v2.0.0**([CHANGELOG](./CHANGELOG.md)) | M1-M5 完整周期后的第一个稳定主版本
+
 一键采集小红书、抖音的图片和视频素材。
 
 ## 功能特性
@@ -110,6 +112,8 @@ media-collector-plasmo/
 
 ## 当前开发状态
 
+> v2.0.0 完整 changelog 见 [CHANGELOG.md](./CHANGELOG.md)。下方为开发历程索引,作为变更回顾用。
+
 | 阶段 | 内容 | 状态 |
 |-------|------|------|
 | Phase 1 | 架构重构(拆分 content / background / components) | ✅ 完成 |
@@ -125,6 +129,24 @@ media-collector-plasmo/
 | M3 | 收藏夹(Collections)+ `background/collections.ts` 独立模块 | ✅ 完成 |
 | M4 | 分文件夹导出 + 导出反馈 Toast + 「本周已导出」看板 | ✅ 完成 |
 | M5 | 稳定性与体验打磨(批量选择安全 / 导出文案 / 空状态 / a11y / 视觉一致性 / 响应式) | ✅ 完成 |
+
+## 发布到 Chrome Web Store
+
+发布流程手动触发,GitHub Action `Submit to Web Store`(`.github/workflows/submit.yml`,`workflow_dispatch`):
+
+1. **更新版本号**:`package.json` 的 `version` 字段(同步更新 `displayName` / `description` 如有改动)
+2. **写 changelog**:`CHANGELOG.md` 顶部加新版本段,按 Keep a Changelog 格式
+3. **构建生产包**:
+   ```bash
+   pnpm build        # 输出 build/chrome-mv3-prod/
+   pnpm package      # 输出 build/chrome-mv3-prod.zip
+   ```
+4. **手动验证**(可选但推荐):Chrome `Load unpacked` 选 `build/chrome-mv3-prod/`,跑一遍核心流程(采集 / popup / 库页 / 主题切换 / 收藏夹 / 导出)
+5. **触发 Action**:GitHub 仓库 → Actions → "Submit to Web Store" → Run workflow
+   - 依赖 `SUBMIT_KEYS` secret(Chrome Web Store API key)
+   - Action 跑 `pnpm build` → `pnpm package` → `PlasmoHQ/bpp` 上传
+
+**注意**:Action 内会重新 build/package,本地产物仅用于本地验证。**绝不要**绕过此 Action 用其他方式发布。
 
 详细设计见 [DESIGN.md](./DESIGN.md)。
 
