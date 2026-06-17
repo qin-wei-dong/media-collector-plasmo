@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 变更
+
+- **发布收口(M7)**:公开定位收敛为“小红书素材采集与本地管理工具”;抖音采集暂不作为当前发布承诺,后续根据用户反馈评估。
+- **权限最小化(M7)**:发布版移除 Douyin host permission 和 Douyin content script,降低 Chrome Web Store 审核解释成本。
+- **文档一致性(M7)**:README / AGENTS / 商店文案 / 隐私说明同步当前 action 点击直达全屏素材库的架构。
+
 ## [2.1.0] - 2026-06-17
 
 M6 大素材量效率增强:大列表性能优化、收藏夹管理、导出历史、快捷键补齐、React.memo 性能优化。

@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Chrome extension (Manifest V3) using Plasmo. Collects images/videos from Xiaohongshu and Douyin.
+Chrome extension (Manifest V3) using Plasmo. Current public release collects images/videos from Xiaohongshu notes and manages them in a local full-screen library.
 
 ## Commands
 
@@ -15,10 +15,10 @@ No test suite, no linter. Prettier is set up.
 ## Architecture
 
 ```
-contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + components/  (UI)
+contents/  (page scripts)  →  background/  (service worker)  →  tabs/library.tsx + components/  (UI)
 ```
 
-**Plasmo file-based routing** — files in `contents/` are auto-registered as content scripts, `background/index.ts` is the service worker, `popup.tsx` at root is the popup entry. **`lib/base.ts` is deliberately in `lib/` not `contents/` to prevent it being injected on all URLs.**
+**Plasmo file-based routing** — files in `contents/` are auto-registered as content scripts, `background/index.ts` is the service worker. `tabs/library.tsx` 是当前主要 UI 入口。`background/index.ts` 监听 `chrome.action.onClicked`，点击扩展图标会直接打开或聚焦 `tabs/library.html`。旧 popup 弹窗已在 v2.1.0 后下线，不要再把 popup 当作当前发布入口。**`lib/base.ts` is deliberately in `lib/` not `contents/` to prevent it being injected on all URLs.**
 
 ### XHS MAIN-world interceptor is injected by the background
 
@@ -34,9 +34,9 @@ contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + 
 
 `lib/xhs-image-extractor.ts` 的 `getNoteMediaFromState(noteId)` 读取优先级：`__mc_notes__` 先（首页浮层最可靠），回退 `__mc_state__` / `window.__INITIAL_STATE__`（独立详情页 SSR）。`xhs-detail-collector.ts` 检测浮层/详情页 DOM、注入「采集素材」按钮，**不支持列表页 hover 采集。**
 
-### Popup UI（效率优先资产管理台，M1 重设计）
+### Library UI（效率优先资产管理台）
 
-`popup.tsx` 是 **460×660 紧凑密度**深色 UI（不是旧的 `AuthorGroup → NoteGroup → MediaCard` 三级折叠，也不是 Phase 5 早期的 Hero + AuthorCarousel 沉浸式版）。**主题 token 唯一权威源在 `lib/design-tokens.ts`（P3-19 迁入 + `darkTheme`/`lightTheme` 双主题），由 `lib/use-theme.tsx` 的 `ThemeProvider` 提供。所有组件经 `useTheme()` hook 消费，禁止内联 hex / magic value。**
+`tabs/library.tsx` 是当前发布版主 UI。旧 `popup.tsx` 弹窗已下线,不要再为当前发布版新增 popup 功能。**主题 token 唯一权威源在 `lib/design-tokens.ts`（P3-19 迁入 + `darkTheme`/`lightTheme` 双主题），由 `lib/use-theme.tsx` 的 `ThemeProvider` 提供。所有组件经 `useTheme()` hook 消费，禁止内联 hex / magic value。**
 
 Token 分组（`lib/design-tokens.ts`）：
 
@@ -47,44 +47,40 @@ Token 分组（`lib/design-tokens.ts`）：
 | `btn` | 按钮尺寸 | xs(22) / sm(30) / md(38) / lg(40) |
 | `fs` | 字号 | micro(11) → display(26) |
 | `accent` | Action Blue `#0a84ff` | 选中态 / focus / 品牌强调（dark/light 同色） |
-| `xhs` / `douyin` | 平台品牌色 | 平台 chip 激活态 |
+| `xhs` / `douyin` | 平台品牌色 | 平台 chip / 历史数据标识 |
 | `ambient` | 顶部 radial 渐变 | 浮层/玻璃视觉协调 |
 | `shadowCard` / `shadowFloat` | 阴影 | 卡片 / 浮动操作栏 |
 | `focusRing` / `focusRingOffset` | 键盘焦点 | Apple Action Blue 2px 描边 + offset |
 
-布局自顶向下（紧凑密度版）：
+库页布局：
 
 ```
-顶栏(品牌 logo + "素材库" + 数量角标 + 工具:打开素材库 / 主题切换 / 搜索)
-  → [非搜索态] 数据看板(StatCard × 3:今日 / 总量 / 关注作者)
-  → [searchOpen] 搜索框
-  → [非搜索态] 筛选行:平台 chip(品牌色激活) + 类型 segmented control(📷/🎬)
-  → [authorFilter] 作者筛选指示 chip
-  → 滚动区:时间分节网格(今天 / 昨天 / 本周 / 更早,4 列 1:1 卡片)
-      └─ MediaCard(.mc-card-art hover/press 反馈)
-  → FloatBar(浮动玻璃操作栏:全选 / 导出 / 删除;0 选时 dashed 描边引导)
-  → [undoToastVisible] Toast(底部 snackbar,5 秒「已删除 N 项」可撤销)
-  → [downloadError] Toast(底部 snackbar,4 秒自动消失)
-  → [previewItem] PreviewModal(全屏大图,左右切换 + 原帖链接)
-  → [空] EmptyState(三步图示 + 快捷键提示)
+左侧栏(全部/最近/未分类/收藏夹/平台)
+  → 顶部 toolbar(标题 + 搜索 + 导出历史 + 排序 + 视图切换)
+  → 数据看板(今日采集 / 素材总量 / 关注作者 / 本周已导出)
+  → subbar(平台 / 类型筛选 + 已显示计数 + 批量操作)
+  → 滚动区:时间分节网格或列表(渐进渲染)
+  → [previewItem] PreviewModal(全屏预览,同笔记左右切换)
+  → [dialog] CollectionDialog / ExportHistoryModal
+  → [notice] LibraryToast
 ```
 
-> **M1 之前的 `Hero` / `AuthorCarousel` 组件已删除**(2026-06 cleanup),popup 不再有大图 Hero 与作者轮播。如需类似视觉效果,直接重写即可,无历史包袱。
+> 旧 popup 的 `Hero` / `AuthorCarousel` 组件已删除(2026-06 cleanup),当前发布版不要恢复 popup 作为主入口。
 
 **关键交互(2026-06 更新):**
 
 - **删除流程**:FloatBar 点垃圾桶 → **立即删除** → 底部 Toast「已删除 N 项 撤销」(5 秒)。点击撤销通过 `RESTORE_ITEMS` 消息把原 `MediaItem[]` 写回 `chrome.storage.local`(`background/storage.ts` 的 `restoreItems()`,按 id 去重)。**不再使用**早期的"3 秒倒计时二次确认"机制。
 - **类型筛选** 是 2 图标 segmented control(📷 图片 / 🎬 视频),单选 toggle。修复了早期"全部"在平台 + 类型两组重复出现的 UX bug。
 - **主题切换**:顶栏第二个工具按钮,`auto` / `dark` / `light` 三态循环,持久化到 `chrome.storage.local[theme_mode]`,`auto` 模式跟随 `matchMedia("(prefers-color-scheme: dark)")`。
-- **键盘快捷键** (`popup.tsx` 顶层 effect):
-  - `Cmd/Ctrl+K` 切换搜索
-  - `/` (非输入态) 打开搜索
-  - `Esc` 关闭搜索;穿透到 PreviewModal 的 Esc 处理
-- **a11y**:所有 icon 按钮带 `aria-label`;MediaCard 卡片区是 `role="button"` + Tab 可达;全局 `:focus-visible` 蓝色 ring 由 `injectPopupStyles()` 注入。
+- **键盘快捷键** (`tabs/library.tsx`):
+  - `Cmd/Ctrl+K` 聚焦搜索
+  - `Cmd/Ctrl+A` 全选当前筛选结果(输入态不拦截)
+  - `E` 导出选中素材 / `C` 打开收藏夹操作
+  - `Delete` / `Backspace` 删除选中素材(走撤销 Toast)
+  - `Esc` 优先级:对话框 > 预览 > 搜索
+- **a11y**:所有 icon 按钮带 `aria-label`;LibraryCell/LibraryRow 可键盘激活;全局 `:focus-visible` 蓝色 ring 由 `injectLibraryStyles()` 注入。
 
-数据聚合全在 `popup.tsx` 的 `useMemo` 里(`authors` / `stats` / `noteImageCounts` / `filteredItems` / `timeBuckets`);`MediaItem._selected` 是 UI 态、不持久化。
-
-**全屏素材库页(M2)**:独立 tab 页 `tabs/library.tsx`,左栏导航(全部/最近/未分类/收藏夹/平台) + 右侧主体(数据看板 + 密集网格 + 批量操作)。**M2 已上线**,popup 顶栏"打开素材库"工具按钮 → `chrome.tabs.create({url: "tabs/library.html"})`。
+数据聚合主要在 `tabs/library.tsx` 的 `useMemo` 里(`enrichedItems` / `authors` / `stats` / `sidebarCounts` / `collectionCounts` / `filteredItems` / `sortedItems` / `visibleItems` / `buckets`);`MediaItem._selected` 是 UI 态、不持久化。
 
 ## ⚠️ 采集模式:点开笔记即采集(不支持列表页 hover)
 
@@ -98,6 +94,10 @@ Token 分组（`lib/design-tokens.ts`）：
 信息流瀑布流卡片只有封面图、视频元数据缺失；曾经尝试的列表页方案——hover + DOM 猜测 + `__mc_vurl_` 视频缓存（死代码，已删）+ API 预取（被 CSP 拦 / 反爬 `_sabo_*` 返回 500）——全部脆弱或失效，已统一移除。
 
 **不要**重新引入列表页 hover 采集逻辑，除非确认 XHS 反爬策略已根本改变。
+
+## 发布范围说明(M7)
+
+当前公开发布版只承诺小红书素材采集与本地管理。抖音采集暂不作为发布承诺，`contents/douyin.ts` 在发布收口中下线；后续是否恢复取决于真实用户反馈和稳定性验证。不要在 README、商店文案或 manifest 权限中重新承诺抖音，除非已有新的 M 级计划明确批准。
 
 ## Key Conventions
 
@@ -134,7 +134,7 @@ M5 不新增功能,只把现有能力打磨到"长期可用"状态。详见 `doc
 
 ### 库页空状态分支
 
-- `items.length === 0`:大空状态(图标 + 标题 + 引导语),引导用户去 XHS/抖音采集
+- `items.length === 0`:大空状态(图标 + 标题 + 引导语),当前发布版引导用户去 XHS 采集
 - `items.length > 0 && sortedItems.length === 0`:小空状态(动态描述当前筛选条件 + 一键清空按钮)
 - 收藏夹视图无匹配时,标题为「当前收藏夹暂无匹配素材」,与其他筛选区分
 
@@ -144,7 +144,7 @@ M5 不新增功能,只把现有能力打磨到"长期可用"状态。详见 `doc
 - 部分成功文案:`已导出 X / N 项到 素材库/<folder>/，Y 项失败`(中文逗号 + 目标目录信息)
 - Toast action label:**"打开下载目录"**(不是"打开文件夹"——`chrome.downloads.showDefaultFolder()` 只承诺打开默认下载目录,不能定位到 `media-collector/<folder>/` 子目录)
 - `SHOW_DOWNLOADS_FOLDER` 失败时:background 调 `showNote("无法打开下载目录", "请在 Chrome 下载记录中查看")` 系统通知兜底
-- 下载失败统一文案:`导出失败，请确保小红书或抖音页面可访问`(中文逗号)
+- 下载失败统一文案:`导出失败，请确保小红书页面可访问`(中文逗号)
 
 ### 库页键盘与 a11y
 
