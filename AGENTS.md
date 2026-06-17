@@ -34,49 +34,57 @@ contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + 
 
 `lib/xhs-image-extractor.ts` 的 `getNoteMediaFromState(noteId)` 读取优先级：`__mc_notes__` 先（首页浮层最可靠），回退 `__mc_state__` / `window.__INITIAL_STATE__`（独立详情页 SSR）。`xhs-detail-collector.ts` 检测浮层/详情页 DOM、注入「采集素材」按钮，**不支持列表页 hover 采集。**
 
-### Popup UI（Apple Music 风）
+### Popup UI（效率优先资产管理台，M1 重设计）
 
-`popup.tsx` 是 Apple Music 沉浸风深色 UI（不是旧的 `AuthorGroup → NoteGroup → MediaCard` 三级折叠，那些组件已删除）。**主题 token 唯一权威源在 `popup-theme.ts`，所有组件必须用 `theme.*`，禁止内联 magic value。** Token 分组见 `mockups/tokens.css` + `popup-theme.ts`：
+`popup.tsx` 是 **460×660 紧凑密度**深色 UI（不是旧的 `AuthorGroup → NoteGroup → MediaCard` 三级折叠，也不是 Phase 5 早期的 Hero + AuthorCarousel 沉浸式版）。**主题 token 唯一权威源在 `lib/design-tokens.ts`（P3-19 迁入 + `darkTheme`/`lightTheme` 双主题），由 `lib/use-theme.tsx` 的 `ThemeProvider` 提供。所有组件经 `useTheme()` hook 消费，禁止内联 hex / magic value。**
 
-| Token | 用途 | 档位 |
+Token 分组（`lib/design-tokens.ts`）：
+
+| Token | 用途 | 档位 / 取值 |
 |---|---|---|
 | `r` | 圆角 | xs(5) / sm(8) / md(11) / lg(18) / pill |
 | `sp` | 间距(8pt) | xxs / xs / sm / md / lg / xl / xxl |
 | `btn` | 按钮尺寸 | xs(22) / sm(30) / md(38) / lg(40) |
 | `fs` | 字号 | micro(11) → display(26) |
-| `accent` | Action Blue `#0066cc` | 选中态 / focus / 品牌强调 |
+| `accent` | Action Blue `#0a84ff` | 选中态 / focus / 品牌强调（dark/light 同色） |
 | `xhs` / `douyin` | 平台品牌色 | 平台 chip 激活态 |
+| `ambient` | 顶部 radial 渐变 | 浮层/玻璃视觉协调 |
+| `shadowCard` / `shadowFloat` | 阴影 | 卡片 / 浮动操作栏 |
+| `focusRing` / `focusRingOffset` | 键盘焦点 | Apple Action Blue 2px 描边 + offset |
 
-布局自顶向下：
+布局自顶向下（紧凑密度版）：
 
 ```
-顶栏（品牌 logo + "素材" + 数量角标 + 搜索按钮）
-  → [searchOpen] 搜索框（P1-2: 搜索时筛选行折叠）
-  → [not searchOpen] 筛选行:平台 chip(品牌色激活) + 类型 segmented control(📷/🎬)
+顶栏(品牌 logo + "素材库" + 数量角标 + 工具:打开素材库 / 主题切换 / 搜索)
+  → [非搜索态] 数据看板(StatCard × 3:今日 / 总量 / 关注作者)
+  → [searchOpen] 搜索框
+  → [非搜索态] 筛选行:平台 chip(品牌色激活) + 类型 segmented control(📷/🎬)
   → [authorFilter] 作者筛选指示 chip
-  → Hero(最新带封面素材大图,16:9 + maxHeight 180,右上角 下载/原帖 快速操作)
-  → 滚动区:
-      ├─ AuthorCarousel(圆形头像,渐变占位 + coverUrl 淡入)
-      └─ 时间分节网格(今天/昨天/本周/更早)
-          └─ MediaCard(.mc-card-art hover/press 反馈,1:1)
-  → FloatBar(浮动玻璃操作栏:全选 / 批量下载 / 删除;0 选时 dashed 描边引导)
+  → 滚动区:时间分节网格(今天 / 昨天 / 本周 / 更早,4 列 1:1 卡片)
+      └─ MediaCard(.mc-card-art hover/press 反馈)
+  → FloatBar(浮动玻璃操作栏:全选 / 导出 / 删除;0 选时 dashed 描边引导)
   → [undoToastVisible] Toast(底部 snackbar,5 秒「已删除 N 项」可撤销)
-  → [downloadError] Toast(底部 snackbar,自动消失)
+  → [downloadError] Toast(底部 snackbar,4 秒自动消失)
   → [previewItem] PreviewModal(全屏大图,左右切换 + 原帖链接)
   → [空] EmptyState(三步图示 + 快捷键提示)
 ```
+
+> **M1 之前的 `Hero` / `AuthorCarousel` 组件已删除**(2026-06 cleanup),popup 不再有大图 Hero 与作者轮播。如需类似视觉效果,直接重写即可,无历史包袱。
 
 **关键交互(2026-06 更新):**
 
 - **删除流程**:FloatBar 点垃圾桶 → **立即删除** → 底部 Toast「已删除 N 项 撤销」(5 秒)。点击撤销通过 `RESTORE_ITEMS` 消息把原 `MediaItem[]` 写回 `chrome.storage.local`(`background/storage.ts` 的 `restoreItems()`,按 id 去重)。**不再使用**早期的"3 秒倒计时二次确认"机制。
 - **类型筛选** 是 2 图标 segmented control(📷 图片 / 🎬 视频),单选 toggle。修复了早期"全部"在平台 + 类型两组重复出现的 UX bug。
+- **主题切换**:顶栏第二个工具按钮,`auto` / `dark` / `light` 三态循环,持久化到 `chrome.storage.local[theme_mode]`,`auto` 模式跟随 `matchMedia("(prefers-color-scheme: dark)")`。
 - **键盘快捷键** (`popup.tsx` 顶层 effect):
   - `Cmd/Ctrl+K` 切换搜索
   - `/` (非输入态) 打开搜索
   - `Esc` 关闭搜索;穿透到 PreviewModal 的 Esc 处理
-- **a11y**:所有 icon 按钮带 `aria-label`;Hero / MediaCard 卡片区是 `role="button"` + Tab 可达;全局 `:focus-visible` 蓝色 ring 由 `injectPopupStyles()` 注入。
+- **a11y**:所有 icon 按钮带 `aria-label`;MediaCard 卡片区是 `role="button"` + Tab 可达;全局 `:focus-visible` 蓝色 ring 由 `injectPopupStyles()` 注入。
 
-数据聚合全在 `popup.tsx` 的 `useMemo` 里(`heroItem` / `authors` / `noteImageCounts` / `filteredItems` / `timeBuckets`);`MediaItem._selected` 是 UI 态、不持久化。
+数据聚合全在 `popup.tsx` 的 `useMemo` 里(`authors` / `stats` / `noteImageCounts` / `filteredItems` / `timeBuckets`);`MediaItem._selected` 是 UI 态、不持久化。
+
+**全屏素材库页(M2)**:独立 tab 页 `tabs/library.tsx`,左栏导航(全部/最近/未分类/收藏夹/平台) + 右侧主体(数据看板 + 密集网格 + 批量操作)。**M2 已上线**,popup 顶栏"打开素材库"工具按钮 → `chrome.tabs.create({url: "tabs/library.html"})`。
 
 ## ⚠️ 采集模式:点开笔记即采集(不支持列表页 hover)
 
@@ -109,7 +117,7 @@ contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + 
 | `PLATFORM_LABELS` | `types.ts` | display labels for platforms |
 | `MessageType` | `types.ts` | string union of background message types (含 `RESTORE_ITEMS`、`SHOW_DOWNLOADS_FOLDER`) |
 | `MessagePayloads` | `types.ts` | per-message payload type map |
-| `theme` | `popup-theme.ts` | popup UI 主题 token 唯一权威源(参见上面 Popup UI 表格) |
+| `theme` | `lib/design-tokens.ts` | popup UI 主题 token 唯一权威源(`darkTheme` / `lightTheme` 双主题 + `ThemeTokens` 接口)。由 `lib/use-theme.tsx` 的 `ThemeProvider` 提供,组件经 `useTheme()` hook 消费 |
 | `localStorage.__mc_state__` | `lib/xhs-state-inject.ts` | synced `__INITIAL_STATE__`（详情页 SSR，cross-world） |
 | `localStorage.__mc_notes__` | `lib/xhs-state-inject.ts` | fetch/XHR 拦截缓存的笔记媒体（首页浮层 CSR，LRU 上限 200） |
 

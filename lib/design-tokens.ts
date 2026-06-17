@@ -55,7 +55,6 @@ export interface ThemeTokens {
 
   // ===== 阴影 =====
   shadowCard: string
-  shadowHero: string
   shadowFloat: string
 
   // ===== 动效 =====
@@ -68,7 +67,7 @@ export interface ThemeTokens {
   focusRing: string
   focusRingOffset: string
 
-  // ===== 氛围背景(由 Hero 封面色渗入) =====
+  // ===== 氛围背景(顶部 radial 渐变,与浮层/玻璃视觉协调) =====
   ambient: string
 }
 
@@ -114,7 +113,6 @@ export const darkTheme: ThemeTokens = {
   glassBlurStrong: "saturate(180%) blur(30px)",
 
   shadowCard: "0 8px 20px rgba(0,0,0,0.45)",
-  shadowHero: "0 16px 36px rgba(0,0,0,0.5)",
   shadowFloat: "0 16px 40px rgba(0,0,0,0.5)",
 
   easeSpring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
@@ -125,7 +123,7 @@ export const darkTheme: ThemeTokens = {
   focusRing: "0 0 0 2px #0a84ff",
   focusRingOffset: "0 0 0 2px #0a84ff, 0 0 0 4px rgba(10,132,255,0.25)",
 
-  // 深色氛围:从顶部散出红 + 紫双色调,与 Hero 视觉协调
+  // 深色氛围:从顶部散出红 + 紫双色调,与浮层/玻璃视觉协调
   ambient:
     "radial-gradient(ellipse 70% 45% at 30% 0%, rgba(255,90,95,0.22), transparent 60%)," +
     "radial-gradient(ellipse 65% 55% at 85% 25%, rgba(120,80,255,0.18), transparent 55%)," +
@@ -174,7 +172,6 @@ export const lightTheme: ThemeTokens = {
   glassBlurStrong: "saturate(180%) blur(30px)",
 
   shadowCard: "0 4px 14px rgba(0,0,0,0.08)",
-  shadowHero: "0 8px 24px rgba(0,0,0,0.10)",
   shadowFloat: "0 8px 24px rgba(0,0,0,0.10)",
 
   easeSpring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
@@ -190,28 +187,6 @@ export const lightTheme: ThemeTokens = {
     "radial-gradient(ellipse 70% 45% at 30% 0%, rgba(255,90,95,0.06), transparent 60%)," +
     "radial-gradient(ellipse 65% 55% at 85% 25%, rgba(120,80,255,0.05), transparent 55%)," +
     "linear-gradient(180deg, #ffffff 0%, #f5f5f7 100%)",
-}
-
-// ===== 头像渐变(不依赖主题,放一起便于维护) =====
-
-export const avatarGradients = [
-  "linear-gradient(135deg, #FF5A5F, #FF2D55)",
-  "linear-gradient(135deg, #5AC8FA, #007AFF)",
-  "linear-gradient(135deg, #AF52DE, #5856D6)",
-  "linear-gradient(135deg, #FFD60A, #FF9500)",
-  "linear-gradient(135deg, #34C759, #30B0C7)",
-  "linear-gradient(135deg, #FF9500, #FF2D55)",
-  "linear-gradient(135deg, #5856D6, #BF5AF2)",
-  "linear-gradient(135deg, #64D2FF, #007AFF)",
-]
-
-/** 给作者名分配稳定的渐变色(同名永远同色) */
-export function getAvatarGradient(name: string): string {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0
-  }
-  return avatarGradients[Math.abs(hash) % avatarGradients.length]
 }
 
 // ===== 时间分桶(不依赖主题) =====

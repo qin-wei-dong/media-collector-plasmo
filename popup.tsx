@@ -405,13 +405,13 @@ function Popup() {
             <span style={styles.countBadge} aria-label={`共 ${items.length} 项素材`}>{items.length}</span>
           </div>
           <div style={styles.tools}>
-            {/* M1 占位:打开全屏素材库(M2 上线真实跳转) */}
+            {/* 打开全屏素材库(独立 tab 页,左栏导航 + 批量操作 + 收藏夹) */}
             <div
               style={styles.tool}
               role="button"
               tabIndex={0}
-              aria-label="打开素材库(即将上线)"
-              title="素材库(M2 上线)"
+              aria-label="打开素材库"
+              title="打开素材库"
               onClick={openLibrary}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {

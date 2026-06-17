@@ -286,7 +286,8 @@ popup → background:
 - [ ] **轮播/SPA 找"可见"元素**:用与视口的交集面积判断,不能用元素自身面积/offsetParent
 - [ ] **动效中的定位**:不要"边算边显示",用稳定性确认(连续两次坐标一致)再显示,避免跳动
 - [ ] **用户说"不满意"**:先问方向,不要闷头微调细节
-- [ ] **设计 token 必须单源**:改色 / 圆角 / 间距时改 `popup-theme.ts` 一处即可,组件禁止内联 magic value
+- [ ] **设计 token 必须单源**:改色 / 圆角 / 间距时改 `lib/design-tokens.ts` + `lib/use-theme.tsx` 一处即可,组件禁止内联 magic value
+  - 📅 **2026-06 cleanup 后续**:`popup-theme.ts` 已删除(P3-19 迁移),当前权威源在 `lib/design-tokens.ts`(`ThemeTokens` 接口 + `darkTheme`/`lightTheme` 双主题);坑 11 中"popup-theme.ts"指代的就是今天的 `lib/design-tokens.ts`,教训依然成立
 - [ ] **icon-only 按钮必带 aria-label**:Tab 键用户和读屏用户的可达性基本要求
 - [ ] **删除等破坏性操作**:用 Toast 撤销,不用「时间倒计时二次确认」
 - [ ] **调试定位问题**:不要盲改,先用 `getBoundingClientRect()` dump 实际坐标,用真实数据定位根因

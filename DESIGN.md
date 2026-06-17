@@ -134,7 +134,7 @@ media-collector-plasmo/
 │   ├── EmptyState.tsx           ← 空状态(三步图示 + 快捷键提示)
 │   └── Toast.tsx                ← 底部 snackbar(删除撤销 / 错误提示)
 ├── popup.tsx                    ← 弹窗主组件
-├── popup-theme.ts               ← 主题 token 唯一权威源
+├── popup-theme.ts               ← 主题 token 唯一权威源(已迁出,见下文注脚)
 ├── popup.html                   ← 弹窗容器(460px / 圆角 / 隐藏滚动条)
 ├── types.ts                     ← 共享类型定义
 └── assets/
@@ -239,7 +239,9 @@ Phase 1-4 的 popup 仍然是基于「AuthorGroup → NoteGroup → MediaCard」
 #### 5.1 视觉与品牌
 
 - 整体重设计为 **Apple Music 沉浸式深色**(Hero + 作者轮播 + 时间分节网格 + 浮动玻璃操作栏 + 大图预览)
+  - 📅 **2026-06 后续变更**:M1 (popup-density) 又把弹窗改为紧凑密度(数据看板 + 4 列网格),Hero + AuthorCarousel 于 2026-06 cleanup 删除;M1 描述见 `docs/superpowers/plans/2026-06-16-m1-popup-density-implementation.md`
 - 主题 token 抽取到 `popup-theme.ts`,严格对齐 `mockups/tokens.css`:
+  - 📅 **P3-19 后续迁移**:主题 token 已迁至 `lib/design-tokens.ts`(`ThemeTokens` 接口 + `darkTheme`/`lightTheme` 双主题),由 `lib/use-theme.tsx` 的 `ThemeProvider` 持有;`popup-theme.ts` 已删除。三份文档(CLAUDE.md / AGENTS.md / README.md)均已同步。
   - 强调色从 `#ffffff` 改为 **Apple Action Blue `#0066cc`**(`accent` / `accentFocus` / `accentDark` / `accentLight`)
   - 圆角从 6 档 (8/10/14/16/22/pill) 收齐为 5 档 (5/8/11/18/pill) 与 tokens.css 对齐
   - 新增 `sp` (8pt 间距 7 档) / `btn` (按钮尺寸 4 档) / `fs` (字号 6 档) / `focus` (focus ring) / `xhs` (品牌红) / `douyin` (品牌 cyan) tokens
@@ -343,5 +345,8 @@ Phase 1-4 的 popup 仍然是基于「AuthorGroup → NoteGroup → MediaCard」
 
 - Phase 1 完成后 `DESIGN.md` 描述的 `content.ts` / `background.ts` 单文件结构已不存在，改为按平台拆分的 `contents/` + `background/` 模块
 - Phase 4 的"分组视图"最初实现为 **作者 → 笔记 → 图片卡片** 三层折叠(`AuthorGroup` 嵌入 `NoteGroup` 嵌入 `MediaCard`),Phase 5 重设计为 Apple Music 沉浸式深色界面,三级折叠已被 Hero + 作者轮播 + 时间分节网格取代
+  - 📅 **2026-06 cleanup 后续**:M1 又改为紧凑密度(数据看板 + 4 列网格),Hero / AuthorCarousel 组件于 2026-06 cleanup 删除,popup 仅保留 `StatCard` / `MediaCard` / `FloatBar` / `PreviewModal` / `EmptyState` / `Toast` 六个组件
 - Phase 5 同时删除了 `BatchBar` / `NoteGroup` / `PlatformFilter` 三个组件,被 `FloatBar` / `AuthorCarousel` / 类型 segmented control 取代;新增 `Toast` 组件用于删除撤销和错误提示
+  - 📅 **2026-06 cleanup 后续**:AuthorCarousel 也已删除,被 M1 的紧凑密度(无作者轮播)取代
 - 主题 token 唯一权威源在 `popup-theme.ts`,与 `mockups/tokens.css` 对齐(r/sp/btn/fs/focus/accent/xhs/douyin),组件禁止内联 magic value
+  - 📅 **P3-19 后续迁移**:已迁至 `lib/design-tokens.ts` + `lib/use-theme.tsx`,见 §5.1 段落内 P3-19 注脚
