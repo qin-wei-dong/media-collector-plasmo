@@ -7,6 +7,10 @@ import { PreviewModal } from "../components/PreviewModal"
 
 type Scope = "all" | "recent" | "uncategorized"
 type ViewMode = "grid" | "list"
+
+// M6 Task 2:渐进渲染配置
+const INITIAL_RENDER_COUNT = 160
+const RENDER_INCREMENT = 120
 type DialogState =
   | { type: "create" }
   | { type: "assign" }
@@ -174,6 +178,8 @@ function LibraryPage() {
   const [notice, setNotice] = useState<Notice | null>(null)
   const [dialog, setDialog] = useState<DialogState>(null)
   const [batchDownloading, setBatchDownloading] = useState(false)
+  // M6 Task 2:渐进渲染——只渲染前 N 项,滚动接近底部再追加
+  const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER_COUNT)
 
   useEffect(() => {
     injectLibraryStyles(theme)
@@ -373,6 +379,24 @@ function LibraryPage() {
     }
     return map
   }, [sortedItems])
+
+  // M6 Task 2:渐进渲染——只渲染前 renderLimit 项
+  const visibleItems = useMemo(() => sortedItems.slice(0, renderLimit), [sortedItems, renderLimit])
+  const visibleBuckets = useMemo(() => {
+    const map = new Map<string, MediaItem[]>()
+    for (const item of visibleItems) {
+      const bucket = getTimeBucket(item.collectedAt)
+      const arr = map.get(bucket)
+      if (arr) arr.push(item)
+      else map.set(bucket, [item])
+    }
+    return map
+  }, [visibleItems])
+
+  // 筛选/搜索/排序/视图变化时重置 renderLimit
+  useEffect(() => {
+    setRenderLimit(INITIAL_RENDER_COUNT)
+  }, [search, scope, collectionFilter, platformFilter, typeFilter, sortDesc, viewMode])
 
   const selectedItems = useMemo(() => items.filter((item) => selectedIds.has(item.id)), [items, selectedIds])
   // selectedCount 取 selectedItems.length 而非 selectedIds.size,避免 items 变化时短暂失真
@@ -767,6 +791,12 @@ function LibraryPage() {
           </button>
 
           <div style={styles.bulkRight}>
+            {/* M6 Task 2.6:渐进渲染时显示"已显示 X / N 项",全部加载完显示"共 N 项" */}
+            <span style={styles.subbarCount}>
+              {visibleItems.length < sortedItems.length
+                ? `已显示 ${visibleItems.length} / ${sortedItems.length} 项`
+                : `共 ${sortedItems.length} 项`}
+            </span>
             <button
               className="mc-library-button"
               style={{ ...styles.bulkGhost, ...(allCurrentSelected ? styles.bulkGhostActive : {}) }}
@@ -801,7 +831,17 @@ function LibraryPage() {
           </div>
         </section>
 
-        <section className="mc-library-scroll" style={styles.content}>
+        <section
+          className="mc-library-scroll"
+          style={styles.content}
+          onScroll={(e) => {
+            const el = e.currentTarget
+            // 滚动接近底部时追加渲染(M6 Task 2)
+            if (el.scrollTop + el.clientHeight >= el.scrollHeight - 480) {
+              setRenderLimit((n) => Math.min(n + RENDER_INCREMENT, sortedItems.length))
+            }
+          }}
+        >
           {items.length === 0 ? (
             // M5 Task 3:全局无素材 — 大型引导(库页 1024+ 宽度)
             <div style={styles.emptyLarge}>
@@ -833,30 +873,37 @@ function LibraryPage() {
               </button>
             </div>
           ) : viewMode === "grid" ? (
-            TIME_ORDER.filter((bucket) => buckets.get(bucket)?.length).map((bucket) => (
-              <div key={bucket} style={styles.timeSection}>
-                <div style={styles.sectionTitle}>
-                  <span>{bucket} · {buckets.get(bucket)?.length || 0} 项</span>
+            TIME_ORDER.filter((bucket) => buckets.get(bucket)?.length).map((bucket) => {
+              const allInBucket = buckets.get(bucket)?.length || 0
+              const visibleInBucket = visibleBuckets.get(bucket) || []
+              return (
+                <div key={bucket} style={styles.timeSection}>
+                  <div style={styles.sectionTitle}>
+                    <span>{bucket} · {allInBucket} 项</span>
+                    {visibleInBucket.length < allInBucket && (
+                      <span style={styles.sectionPartial}>已显示 {visibleInBucket.length} / {allInBucket}</span>
+                    )}
+                  </div>
+                  <div style={styles.grid}>
+                    {visibleInBucket.map((item) => (
+                      <LibraryCell
+                        key={item.id}
+                        item={item}
+                        selected={selectedIds.has(item.id)}
+                        imageCount={item.noteId ? noteImageCounts.get(item.noteId) : undefined}
+                        onPreview={() => setPreviewItem(item)}
+                        onToggleSelect={() => toggleItem(item)}
+                        onDownload={() => downloadItems([item])}
+                        onOpenSource={() => openSource(item)}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div style={styles.grid}>
-                  {(buckets.get(bucket) || []).map((item) => (
-                    <LibraryCell
-                      key={item.id}
-                      item={item}
-                      selected={selectedIds.has(item.id)}
-                      imageCount={item.noteId ? noteImageCounts.get(item.noteId) : undefined}
-                      onPreview={() => setPreviewItem(item)}
-                      onToggleSelect={() => toggleItem(item)}
-                      onDownload={() => downloadItems([item])}
-                      onOpenSource={() => openSource(item)}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
+              )
+            })
           ) : (
             <div style={styles.list}>
-              {sortedItems.map((item) => (
+              {visibleItems.map((item) => (
                 <LibraryRow
                   key={item.id}
                   item={item}
@@ -865,6 +912,19 @@ function LibraryPage() {
                   onToggleSelect={() => toggleItem(item)}
                 />
               ))}
+            </div>
+          )}
+
+          {/* M6 Task 2:渐进渲染兜底——还有未渲染项时显示"显示更多" */}
+          {visibleItems.length < sortedItems.length && (
+            <div style={styles.loadMoreWrap}>
+              <button
+                className="mc-library-button"
+                style={styles.loadMoreBtn}
+                onClick={() => setRenderLimit((n) => Math.min(n + RENDER_INCREMENT, sortedItems.length))}
+              >
+                继续加载({sortedItems.length - visibleItems.length} 项)
+              </button>
             </div>
           )}
         </section>
@@ -1514,6 +1574,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
   const card = theme.card
   const cardHover = theme.cardHover
   const textTertiary = theme.textTertiary
+  const textSecondary = theme.textSecondary
+  const hairline = theme.hairline
   const green = "#30d158" // success 状态色,design-tokens 暂无对应,保留字面量
 
   return {
@@ -1856,6 +1918,13 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       alignItems: "center",
       gap: 10,
     },
+    // M6 Task 2.6:渐进渲染计数 — 弱化色调,避免与"已选 N 项"主操作抢视觉
+    subbarCount: {
+      fontSize: 12,
+      fontWeight: 500,
+      color: textTertiary,
+      whiteSpace: "nowrap",
+    },
     selectedText: {
       fontSize: 13,
       color: "rgba(255,255,255,0.68)",
@@ -1932,6 +2001,27 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       display: "flex",
       alignItems: "center",
       gap: 8,
+    },
+    sectionPartial: {
+      fontSize: 11,
+      fontWeight: 400,
+      color: `${textTertiary}99`,
+    },
+    loadMoreWrap: {
+      display: "flex",
+      justifyContent: "center",
+      padding: "16px 0 8px",
+    },
+    loadMoreBtn: {
+      background: card,
+      color: textSecondary,
+      border: `0.5px solid ${hairline}`,
+      borderRadius: 10,
+      padding: "8px 20px",
+      fontSize: 13,
+      fontWeight: 500,
+      cursor: "pointer",
+      fontFamily: "inherit",
     },
     grid: {
       display: "grid",
