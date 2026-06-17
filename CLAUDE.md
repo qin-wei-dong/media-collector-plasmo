@@ -79,27 +79,32 @@ The standalone detail-page case (direct note URL, no modal container) is handled
 
 The popup was fully redesigned. It is **not** the old `AuthorGroup → NoteGroup → MediaCard` three-level folding list.
 
-### Theme tokens (`popup-theme.ts`) — **single source of truth**
+### Theme tokens (`lib/design-tokens.ts` + `lib/use-theme.tsx`) — **single source of truth**
 
-`popup-theme.ts` exports a `theme` object that aligns with `mockups/tokens.css` (Apple Liquid Glass spec). All components MUST consume `theme.*` instead of inlining magic numbers/colors. Token groups:
+> **迁移说明**:早期 token 在根目录 `popup-theme.ts`,P3-19 迁至 `lib/design-tokens.ts` 并加 `ThemeTokens` 接口 + `darkTheme`/`lightTheme` 双主题。组件经 `useTheme()` hook 消费(Provider 外 fallback 到 `darkTheme`,不会崩)。所有 token 改动改这两处即可,组件禁止内联 hex / magic number。
+
+Token groups:
 
 | Group | Keys | Purpose |
 |---|---|---|
-| Surface | `bg` / `bgGradient` / `card` / `cardHover` / `floatBar` | dark layered surfaces |
+| Surface | `bg` / `bgGradient` / `card` / `cardHover` / `floatBar` | dark / light layered surfaces |
 | Text | `textPrimary` / `textSecondary` / `textTertiary` | text hierarchy |
-| Accent | `accent` (`#0066cc`) / `accentFocus` / `accentDark` / `accentLight` | **Apple Action Blue** — used for selected rings, focus, brand accents |
+| Accent | `accent` (`#0a84ff`) / `accentFocus` / `accentDark` / `accentLight` | **Apple Action Blue** — used for selected rings, focus, brand accents; 同一取值在 dark/light 下保持一致 |
 | Danger | `danger` / `dangerBg` / `dangerText` | independent of accent; delete / error states |
-| Platform brand | `xhs` (`#FF2442`) / `xhsBg` / `douyin` (`#25F4EE`) / `douyinBg` | chip active states & future platform accents |
-| Radius | `r.xs`(5) / `r.sm`(8) / `r.md`(11) / `r.lg`(18) / `r.pill` | matches `tokens.css` 5-tier scale — **don't add a 6th tier** |
+| Platform brand | `xhs` (`#FF2442`) / `xhsBg` / `douyin` (`#25F4EE` dark / `#0FB8B0` light) / `douyinBg` | chip active states |
+| Radius | `r.xs`(5) / `r.sm`(8) / `r.md`(11) / `r.lg`(18) / `r.pill` | 5-tier scale — **don't add a 6th tier** |
 | Spacing | `sp.xxs`(4) / `sp.xs`(8) / `sp.sm`(12) / `sp.md`(17) / `sp.lg`(24) / `sp.xl`(32) / `sp.xxl`(48) | 8pt scale |
 | Button size | `btn.xs`(22) / `btn.sm`(30) / `btn.md`(38) / `btn.lg`(40) | 4-tier button size system |
 | Font size | `fs.micro`(11) / `fs.caption`(12) / `fs.body`(14) / `fs.bodyLg`(15) / `fs.title`(17) / `fs.display`(26) | Apple type scale |
 | Glass | `glass` / `glassBlur` / `glassBlurStrong` | liquid glass surface utilities |
-| Shadow | `shadowCard` / `shadowHero` / `shadowFloat` | elevation shadows |
+| Shadow | `shadowCard` / `shadowFloat` | elevation shadows |
 | Motion | `easeSpring` / `easeOut` / `durFast` / `dur` | timing tokens |
 | Focus | `focusRing` / `focusRingOffset` | keyboard focus indicators |
+| Ambient | `ambient` | 顶部 radial 渐变背景(浮层/玻璃视觉协调) |
 
-Plus helpers: `avatarGradients` (8-color palette) + `getAvatarGradient(name)` for stable per-author hash → color; `getTimeBucket(collectedAt)` + `TIME_ORDER` for time bucketing (今天 / 昨天 / 本周 / 更早).
+Plus helpers: `getTimeBucket(collectedAt)` + `TIME_ORDER` for time bucketing (今天 / 昨天 / 本周 / 更早).
+
+主题切换由 `lib/use-theme.tsx` 的 `ThemeProvider` 持有(支持 `auto` / `dark` / `light` 三态),用户选择持久化到 `chrome.storage.local[theme_mode]`,`auto` 模式下通过 `matchMedia("(prefers-color-scheme: dark)")` 跟随系统。
 
 `popup.html` sets the 460px-wide, rounded, transparent, scrollbar-hidden popup shell.
 

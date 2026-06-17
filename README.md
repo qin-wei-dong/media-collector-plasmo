@@ -72,10 +72,16 @@ pnpm package
 
 ```
 media-collector-plasmo/
-├── popup.tsx                  ← 弹窗主组件(Apple Music 风:时间分节 + 作者轮播 + Toast)
-├── popup.html                 ← 弹窗容器(460px / 圆角 / 隐藏滚动条)
-├── popup-theme.ts             ← 主题 token(r/sp/btn/fs/focus/accent/xhs/douyin) + 作者渐变 + 时间分桶
-├── types.ts                   ← MediaItem / MessageType / 常量(含 RESTORE_ITEMS)
+├── popup.tsx                  ← 弹窗主组件(M1 紧凑密度:数据看板 + 4 列时间分节网格 + Toast)
+├── popup.html                 ← 弹窗容器(460×660 / 圆角 / 隐藏滚动条)
+├── lib/
+│   ├── design-tokens.ts       ← 主题 token 唯一权威源(ThemeTokens 接口 + darkTheme/lightTheme + 时间分桶)
+│   ├── use-theme.tsx          ← ThemeProvider + useTheme hook(auto/dark/light 三态,持久化)
+│   ├── base.ts                ← HoverUIManager(抖音用)/ 媒体检测 / Toast / 下载工具(部分遗留)
+│   ├── xhs-state-inject.ts    ← stateInjector():被 background executeScript 注入 MAIN world
+│   ├── xhs-detail-collector.ts ← 小红书浮层 DOM 检测 + 「采集素材」按钮跟随
+│   └── xhs-image-extractor.ts ← 小红书笔记媒体提取(__mc_notes__ / __mc_state__ 两通路)
+├── types.ts                   ← MediaItem / MessageType / 常量(含 RESTORE_ITEMS / 收藏夹消息)
 ├── package.json               ← manifest + 快捷键 + 依赖
 │
 ├── contents/                  ← 内容脚本(按平台拆分)
@@ -84,37 +90,40 @@ media-collector-plasmo/
 │
 ├── background/                ← 后台服务(service worker)
 │   ├── index.ts               ← 消息路由 + executeScript 注入 MAIN world + 右键菜单 + 快捷键
-│   ├── storage.ts             ← chrome.storage.local CRUD(带写队列)+ restoreItems 删除撤销
-│   └── download.ts            ← SW fetch + Referer + data URL 下载
+│   ├── storage.ts             ← chrome.storage.local CRUD(带写队列)+ restoreItems 删除撤销 + markItemsExported
+│   ├── collections.ts         ← 收藏夹 CRUD(级联清理 MediaItem.collectionIds)
+│   └── download.ts            ← SW fetch + Referer + data URL 下载(防路径穿越,分文件夹)
 │
-├── lib/
-│   ├── base.ts                 ← HoverUIManager(抖音用)/ 媒体检测 / Toast / 下载工具(部分遗留)
-│   ├── xhs-state-inject.ts     ← stateInjector():被 background executeScript 注入 MAIN world
-│   ├── xhs-detail-collector.ts ← 小红书浮层 DOM 检测 + 「采集素材」按钮跟随
-│   └── xhs-image-extractor.ts  ← 小红书笔记媒体提取(__mc_notes__ / __mc_state__ 两通路)
-│
-├── components/                ← popup 用 React 组件(Apple Music 风)
-│   ├── Hero.tsx               ← 最新素材大图 + 快速操作(下载/原帖)
-│   ├── AuthorCarousel.tsx     ← 作者头像横向轮播(渐变占位 + coverUrl 淡入,点击筛选)
+├── components/                ← popup / library 用 React 组件
+│   ├── StatCard.tsx           ← 数据看板卡片(今日 / 总量 / 关注作者)
 │   ├── MediaCard.tsx          ← 单素材封面卡(点击预览,圆圈选中,hover/press 反馈)
-│   ├── FloatBar.tsx           ← 浮动操作栏(全选 / 批量下载 / 删除;0 选时 dashed 引导)
+│   ├── FloatBar.tsx           ← 浮动操作栏(全选 / 导出 / 删除;0 选时 dashed 引导)
 │   ├── PreviewModal.tsx       ← 大图预览(同笔记图片左右切换 + 键盘 ← →)
 │   ├── EmptyState.tsx         ← 空状态(三步图示 + 快捷键提示)
 │   └── Toast.tsx              ← 底部 snackbar(删除撤销 / 错误提示共用)
+│
+├── tabs/                      ← 全屏 tab 页
+│   └── library.tsx            ← M2 素材库:左栏导航 + 数据看板 + 密集网格 + 批量操作 + 收藏夹
 │
 └── AGENTS.md / CLAUDE.md / DESIGN.md / LESSONS.md
 ```
 
 ## 当前开发状态
 
-| Phase | 内容 | 状态 |
+| 阶段 | 内容 | 状态 |
 |-------|------|------|
-| 1 | 架构重构(拆分 content / background / components) | ✅ 完成 |
-| 2 | 抖音无水印下载 + 批量下载用户视频 | ⏸️ 暂缓 |
+| Phase 1 | 架构重构(拆分 content / background / components) | ✅ 完成 |
+| Phase 2 | 抖音无水印下载 + 批量下载用户视频 | ⏸️ 暂缓(列表页反爬限制) |
 | 收敛 | XHS 列表页 hover 采集整体移除,统一为详情页一键采集 | ✅ 完成 |
-| 3 | 小红书多图提取 + 笔记分组显示 | ✅ 完成 |
-| 4 | 弹窗增强(作者分组、平台筛选、批量操作) | ✅ 完成 |
-| 5 | popup UI 重设计(Apple Music 风 + Toast 撤销 + a11y + 主题 token 统一) | ✅ 完成 |
+| Phase 3 | 小红书多图提取 + 笔记分组显示 | ✅ 完成 |
+| Phase 4 | 弹窗增强(作者分组、平台筛选、批量操作) | ✅ 完成 |
+| Phase 5 | popup UI 重设计(Apple Music 风 + Toast 撤销 + a11y + 主题 token 统一) | ✅ 完成 |
+| P3-19 | `popup-theme.ts` → `lib/design-tokens.ts`(`ThemeTokens` 接口 + 双主题) | ✅ 完成 |
+| P3-21 | light 主题 + 跟随系统 + 顶栏主题切换 UI | ✅ 完成 |
+| M1 | popup 紧凑密度重设计(数据看板 + 4 列网格) | ✅ 完成 |
+| M2 | 全屏素材库 `tabs/library.tsx` | ✅ 完成 |
+| M3 | 收藏夹(Collections)+ `background/collections.ts` 独立模块 | ✅ 完成 |
+| M4 | 分文件夹导出 + 导出反馈 Toast + 「本周已导出」看板 | ✅ 完成 |
 
 详细设计见 [DESIGN.md](./DESIGN.md)。
 
