@@ -4,6 +4,39 @@ All notable changes to this project will be documented in this file.
 
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。版本号遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 
+## [2.1.0] - 2026-06-17
+
+M6 大素材量效率增强:大列表性能优化、收藏夹管理、导出历史、快捷键补齐、React.memo 性能优化。
+
+### 新增
+
+- **大列表性能**(M6.1):渐进渲染(`INITIAL_RENDER_COUNT=160`,滚动追加 120)+ React.memo 包裹 + 预计算字段(`enrichedItems` 一次性派生 `collectedAtMs` / `timeBucket` / `searchHaystack`)
+- **导出历史**(M6.2):`EXPORT_HISTORY_KEY` 新 storage key,LRU 50 条,`GET_EXPORT_HISTORY` / `CLEAR_EXPORT_HISTORY` / `RETRY_EXPORT_FAILED` 消息,toolbar 按钮 + modal,显示最近 10 条 + 失败项重试
+- **收藏夹管理**(M6.3):`Collection` 加 `sortOrder` / `pinned` / `color`,侧栏按 pinned → sortOrder → createdAt 倒序排序,`UPDATE_COLLECTION_COLOR` / `REORDER_COLLECTIONS` / `PIN_COLLECTION` / `MOVE_COLLECTION_ITEMS` 消息,编辑收藏夹 dialog(置顶 toggle),批量"移动到..."(从源移除并加入目标)
+- **库页快捷键**(M6.4):Cmd/Ctrl+A 全选(输入态不拦截)、Delete/Backspace 删除(走撤销 Toast,输入态不拦截)、E 导出(非输入态)、C 加入收藏夹 dialog(非输入态),`scripts/test-keyboard-shortcuts.mjs` 手动 e2e 验证脚本(12 项断言)
+- **大素材量 UX**(M6.1):subbar 计数 `已显示 X / N 项` / `共 N 项`,section header 显示 `今天 · 80 项 已显示 80 / 80`,筛选无结果显示当前筛选条件
+- **收藏夹迁移**(M6.3 前置):旧 collection 缺 `sortOrder` / `pinned` 时,`migrateCollections()` 按 createdAt 倒序 lazy 写回,后台启动时自动触发
+
+### 变更
+
+- **可靠性收口**(M6.0):采集 / 加载 / 导出回调加 `.catch` 兜底,`loadItems` / `loadCollections` 加 `lastError` 检查 + SW 休眠时重试 1 次;批量下载间隔 300ms → 800ms + 失败重试 1 次 + 错误详情(避免 CDN 限流)
+- **样本数据生成**(M6.1):`generate-sample-items.mjs` 加 `--json` 模式输出纯 JSON(避免 DevTools 粘贴大 JSON 卡死),新增 `serve-samples.mjs` 本地静态服务
+- **视觉一致性**(M6.3):4 处 button `fontWeight: 500` → `600`(LibCell / LibRow / toolbarButton / sidebarCount)
+
+### 修复
+
+- **TDZ 白屏 bug**(M6.4 顺手):PR #10 引入 `useEffect deps [selectedCount, ...]` 在 useEffect 调用时立即求值,selectedCount 后续才声明,触发 `Cannot access before initialization`。改用 `useRef` 模式(handler 在 render 阶段赋值给 ref,useEffect deps = `[]` 只挂载一次)
+- **React DOM 警告**(M6.1 验证时发现):3 处 `borderColor` 单写属性与 `border` 简写冲突(渲染时 React 移除 borderColor,选中态边框错乱),全部改完整 `border` 简写;`SidebarItem` 外层 `<button>` 改 `<div role="button">`(因 M5 加了"改/删"真实 button,button 嵌套 button 违反 HTML 规范)
+- **删除撤销排序保证**(M5 + 验证):`restoreItems` 按 id 去重保留原始 `id` / `collectedAt`,撤销后排序与删除前完全一致
+- **侧栏收藏夹顺序稳定性**(M6.3):新 collection `sortOrder = max + 1` 显式赋值,UI 排序可预测,不再依赖 `prepend` 顺序
+
+### 安全
+
+- **`enqueueWrite()` 串行化新增写入**:导出历史 / 收藏夹排序 / 移动条目 / 改色 / 置顶 全部走串行队列
+- **M6.0 Spike 结论**:单个下载成功,批量部分失败 → **CDN 限流**(非防盗链 / 非 OOM),不引入 `offscreen` / `declarativeNetRequest` 权限
+- **路径穿越防御**:`isUnsafePath` 持续生效
+- **导出历史 LRU 50**:不存 blob / data URL,只存 url / filename / error 最小重试信息
+
 ## [2.0.0] - 2026-06-17
 
 M1-M5 完整周期后的第一个稳定主版本。新增全屏素材库、收藏夹、分文件夹导出、light 主题,popup 全面重设计。

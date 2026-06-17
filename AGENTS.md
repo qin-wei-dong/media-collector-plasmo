@@ -192,6 +192,60 @@ pnpm audit:a11y       # axe-core 审计(仅 popup 覆盖)
 - 虚拟滚动(M6)
 - 导出历史与失败重试(M6)
 
+## M6 大素材量效率增强(2026-06)
+
+M6 解决"几十条 → 几百/上千条"场景下的卡顿、不可靠、摩擦。详见 `docs/superpowers/plans/2026-06-17-m6-large-library-efficiency-implementation.md`。
+
+### M6.0 可靠性收口(前置)
+
+- 采集 / 加载回调加 `.catch` 兜底,`loadItems` / `loadCollections` 加 `chrome.runtime.lastError` 检查 + SW 休眠时重试 1 次
+- **下载链路 Spike 结论**:单个成功,批量部分失败 → **CDN 限流**(非防盗链 / 非 OOM)。决策:不改架构(不引入 `offscreen` / `declarativeNetRequest`),只补最小健壮性
+  - `download.ts` 间隔 `300ms` → `800ms`
+  - `downloadOne` 首次失败延迟 1.5s 重试 1 次
+  - 部分失败 Toast 显示前 2 条具体错误原因
+
+### M6.1 大列表性能(`tabs/library.tsx`)
+
+- **渐进渲染**:`INITIAL_RENDER_COUNT=160` / `RENDER_INCREMENT=120`,`renderLimit` state + 滚动监听(`scrollTop + clientHeight ≥ scrollHeight - 480`)自动追加
+- **section header**:`今天 · 80 项 已显示 80 / 80`(完整桶 Y + 已渲染 X)
+- **subbar 计数**:`已显示 X / N 项` / `共 N 项`(弱化色调,视觉上不抢"已选 N 项")
+- **`loadMore` 按钮**:滚动监听失败时的兜底
+- **`enrichedItems` 预计算**:`_collectedAtMs` / `_timeBucket` / `_searchHaystack` 一次性派生,下游 6 处 useMemo 复用,避免重复 `new Date()` / `getTimeBucket()` / 字符串拼
+- **`LibraryCell` / `LibraryRow` 用 `React.memo` 包裹**:prop 类型从 `() => void` 改 `(item: MediaItem) => void`,4 个稳定 `useCallback`(handlePreviewItem / handleToggleItem / handleDownloadOne / handleOpenSource)
+
+### M6.2 导出可靠性
+
+- **新 storage key**:`export_history`(常量 `EXPORT_HISTORY_KEY` + `EXPORT_HISTORY_MAX=50`)
+- **新消息**:`GET_EXPORT_HISTORY` / `CLEAR_EXPORT_HISTORY` / `RETRY_EXPORT_FAILED`
+- **`ExportHistoryEntry`**:id / createdAt / total / successCount / failedCount / folders / itemIds / failedFiles
+- **`appendExportHistory`**:unshift + slice(0, 50) LRU,enqueueWrite 串行
+- **`fetchAndDownload` 返回 `failedFiles`**:完整重试信息(url / filename / platform / error)
+- **`RETRY_EXPORT_FAILED` 复用 `batchDownload` 路径**:继续写新历史(成功/部分成功/全失败都记录)
+- **toolbar 按钮** + `ExportHistoryModal`(Esc 关闭、最近 10 条、状态绿/橙、目录标签、失败项详情 + 重试、清空二次确认)
+- **安全**:不存 blob / data URL,只存 url / filename / error 最小重试信息
+
+### M6.3 收藏夹管理(`background/collections.ts` + `tabs/library.tsx`)
+
+- **`Collection` 加 `sortOrder` / `pinned` / `color`**(可选字段,旧数据通过 `migrateCollections()` 兼容)
+- **`migrateCollections()`**:后台启动时检测旧 collection 缺 `sortOrder` 时按 createdAt 倒序 lazy 写回 + `pinned ?? false` 补默认
+- **`createCollection` 写入 `sortOrder = max + 1`, `pinned = false`**:新加的放最后(配合 UI 排序规则)
+- **新消息**:`UPDATE_COLLECTION_COLOR` / `REORDER_COLLECTIONS` / `PIN_COLLECTION` / `MOVE_COLLECTION_ITEMS`
+- **侧栏排序规则**:`pinned → sortOrder 升序 → createdAt 倒序`
+- **rename dialog → "编辑收藏夹"**:加"置顶到侧栏最前"checkbox,`updateCollection` 串行 3 个 message(RENAME + UPDATE_COLOR + PIN),任一失败即终止
+- **批量"移动到..."**:`assignSelectedToCollection` 在 `collectionFilter` 设置时调 `MOVE_COLLECTION_ITEMS`(从源移除并加入目标,文案与"加入收藏夹"区分)
+
+### M6.4 快捷键与工具
+
+- **库页快捷键**:`Cmd/Ctrl+A` 全选(输入态不拦截)、`Delete`/`Backspace` 删除(走撤销 Toast,输入态不拦截)、`E` 导出、`C` 加入收藏夹 dialog
+- **输入态检测**:`tagName === "INPUT" || "TEXTAREA" || isContentEditable`
+- **TDZ 白屏 bug 修复**(PR #10 遗留):`useEffect deps [selectedCount, ...]` 字面量在 useEffect 调用时立即求值,selectedCount 后续才声明,触发 `Cannot access before initialization`。改用 `useRef` 模式(handler 在 render 阶段赋值给 ref,useEffect deps = `[]` 只挂载一次)
+- **`scripts/test-keyboard-shortcuts.mjs`**:手动 e2e 验证脚本(用户复制到 DevTools Console 跑,12 项断言验证输入态语义)
+
+### M6 工具脚本
+
+- `scripts/generate-sample-items.mjs --json`:输出纯 JSON 供 `fetch + r.json()` 注入,避免大样本(500/1000 条)粘贴 DevTools 卡死
+- `scripts/serve-samples.mjs`:简易本地静态服务(默认 8765 端口),暴露 `/mc-samples-*.json`
+
 ## File routing reminder
 
 Anything in `contents/*.ts` becomes a content script. Helpers shared between content scripts must live in `lib/` (not `contents/`) — otherwise they'd inject on every URL.

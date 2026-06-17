@@ -1,6 +1,6 @@
 # 素材采集助手
 
-**当前版本: v2.0.0**([CHANGELOG](./CHANGELOG.md)) | M1-M5 完整周期后的第一个稳定主版本
+**当前版本: v2.1.0**([CHANGELOG](./CHANGELOG.md)) | M1-M6 完整周期,大素材量效率增强
 
 一键采集小红书、抖音的图片和视频素材。
 
@@ -18,15 +18,18 @@
 - 悬停视频自动显示采集按钮，支持视频下载
 
 ### 通用功能
-- **平台筛选**：全部 / 小红书 / 抖音,选中态用平台品牌色(小红书红 `#FF2442` / 抖音 cyan `#25F4EE`)
-- **类型筛选**：图标 segmented control(📷 图片 / 🎬 视频),单击切换
+- **平台筛选**:全部 / 小红书 / 抖音,选中态用平台品牌色(小红书红 `#FF2442` / 抖音 cyan `#25F4EE`)
+- **类型筛选**:图标 segmented control(📷 图片 / 🎬 视频),单击切换
 - **批量选择 + 批量下载**(自动按笔记标题命名)
 - **分文件夹导出**:全屏素材库页按收藏夹/作者/未分类分子目录落盘(`media-collector/<folder>/`),导出后 Toast 可一键打开文件夹
 - **删除 + 撤销**:点击垃圾桶立即删除,底部 Toast「已删除 N 项」5 秒内可点撤销
-- **键盘快捷键**:`Cmd/Ctrl+K` 或 `/` 打开搜索,`Esc` 关闭搜索/预览
+- **键盘快捷键**:`Cmd/Ctrl+K` 聚焦搜索,`Cmd/Ctrl+A` 全选,`E` 导出,`C` 加入收藏夹,`Delete`/`Backspace` 删除(走撤销),`Esc` 优先级关闭
 - **右键菜单采集**(图片/视频上右键 → "📥 采集此素材")
 - **快捷键采集**(`Ctrl/Cmd+Shift+S`)
 - **反防盗链**:在后台 service worker 中 `fetch()` 携带平台 `Referer`,绕过 CDN 防盗链限制
+- **大列表性能**(`M6`):500-1000 条素材渐进渲染(160 + 120 追加),React.memo + 预计算字段(`collectedAtMs` / `timeBucket` / `searchHaystack`)
+- **导出历史**(`M6`):toolbar 入口,最近 10 条记录(成功/部分失败/失败),失败项一键重试,LRU 50 条
+- **收藏夹增强**(`M6`):侧栏按 pinned → sortOrder → createdAt 排序,编辑 dialog 改色 / 置顶 / 重命名,批量"移动到..."(从源移除并加入目标)
 
 ## 使用方法
 
@@ -112,7 +115,7 @@ media-collector-plasmo/
 
 ## 当前开发状态
 
-> v2.0.0 完整 changelog 见 [CHANGELOG.md](./CHANGELOG.md)。下方为开发历程索引,作为变更回顾用。
+> v2.1.0 完整 changelog 见 [CHANGELOG.md](./CHANGELOG.md)。下方为开发历程索引,作为变更回顾用。
 
 | 阶段 | 内容 | 状态 |
 |-------|------|------|
@@ -129,6 +132,7 @@ media-collector-plasmo/
 | M3 | 收藏夹(Collections)+ `background/collections.ts` 独立模块 | ✅ 完成 |
 | M4 | 分文件夹导出 + 导出反馈 Toast + 「本周已导出」看板 | ✅ 完成 |
 | M5 | 稳定性与体验打磨(批量选择安全 / 导出文案 / 空状态 / a11y / 视觉一致性 / 响应式) | ✅ 完成 |
+| M6 | 大素材量效率增强 — 大列表性能 / 收藏夹增强 / 导出历史 / 快捷键 | ✅ 完成 |
 
 ## 发布到 Chrome Web Store
 
