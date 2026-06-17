@@ -140,3 +140,40 @@ export function restoreItems(items: MediaItem[]): Promise<{ success: boolean; re
     })
   )
 }
+
+/**
+ * 标记一组素材已导出(M4:写入 exportedAt,供库页“本周已导出”看板聚合)。
+ * - 只更新匹配 id 的 exportedAt,其余字段原样保留
+ * - 不改变列表顺序
+ * - 空数组直接返回,不写 storage
+ */
+export function markItemsExported(
+  ids: string[],
+  exportedAt: string
+): Promise<{ success: boolean; updated: number }> {
+  if (!ids.length) return Promise.resolve({ success: true, updated: 0 })
+  const idSet = new Set(ids)
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getItems().then((items) => {
+        let updated = 0
+        const next = items.map((item) => {
+          if (!idSet.has(item.id)) return item
+          updated += 1
+          return { ...item, exportedAt }
+        })
+        if (updated === 0) {
+          resolve({ success: true, updated: 0 })
+          return
+        }
+        chrome.storage.local.set({ [STORAGE_KEY]: next }, () => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message))
+            return
+          }
+          resolve({ success: true, updated })
+        })
+      }).catch(reject)
+    })
+  )
+}

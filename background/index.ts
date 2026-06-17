@@ -236,6 +236,17 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
       batchDownload(message.payload as MessagePayloads["BATCH_DOWNLOAD"]).then((result) => sendResponse(result))
       return true
 
+    case "SHOW_DOWNLOADS_FOLDER": {
+      // 打开 Chrome 默认下载目录(用户需再点进 media-collector/<folder>)
+      try {
+        chrome.downloads.showDefaultFolder()
+        sendResponse({ success: true })
+      } catch (e) {
+        sendResponse({ success: false, error: String(e) })
+      }
+      return true
+    }
+
     default:
       sendResponse({ success: false, error: "未知消息类型" })
       return false

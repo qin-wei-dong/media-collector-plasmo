@@ -96,7 +96,7 @@ contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + 
 - **Inline styles only** — `React.CSSProperties` objects, injected `<style>` tags in content scripts. No CSS modules. `tailwind.config.js` and `style.css` are leftover scaffold artifacts, ignore them.
 - **Path alias** — `~` maps to project root (e.g., `~/types`).
 - **Storage writes** — all `chrome.storage.local` writes go through `enqueueWrite()` in `background/storage.ts` to serialize and prevent races.
-- **Anti-hotlink downloads** — 实际下载在 background service worker：`background/download.ts` 用 `fetch()` 带平台匹配的 `Referer` header 绕 CDN 防盗链，因 SW 无 `URL.createObjectURL` 需把 blob 转 data URL（base64）再 `chrome.downloads`，下载到 `types.ts` 的 `MEDIA_COLLECTOR_DIR`。`lib/base.ts` 的 `handleDownloadImages`（页面内 fetch + blob URL）+ `DOWNLOAD_IMAGES` 消息是遗留未接线代码（无发送方），不要假设它能用。
+- **Anti-hotlink downloads** — 实际下载在 background service worker：`background/download.ts` 的 `fetchAndDownload()` 接收 `DownloadFile[]`（`{ id?, url, filename, platform? }`），**逐项按自身 platform 计算 Referer**（修复混合平台批量导出取第一项的问题），`filename` 可含子目录最终落到 `MEDIA_COLLECTOR_DIR/<folder>/<name>`，因 SW 无 `URL.createObjectURL` 需把 blob 转 data URL（base64）再 `chrome.downloads`。成功项经 `storage.ts` 的 `markItemsExported()` 写入 `exportedAt`，全屏素材库「本周已导出」看板据此聚合。`SHOW_DOWNLOADS_FOLDER` 消息调 `chrome.downloads.showDefaultFolder()` 打开下载根目录（用户需再点进子目录）。`lib/base.ts` 的 `handleDownloadImages`（页面内 fetch + blob URL）+ `DOWNLOAD_IMAGES` 消息是遗留未接线代码（无发送方），不要假设它能用。
 - **Context validity** — content scripts check `chrome.runtime?.id` before sending messages to handle extension reload.
 - **UI language** — all user-facing text is Simplified Chinese.
 
@@ -107,7 +107,7 @@ contents/  (page scripts)  →  background/  (service worker)  →  popup.tsx + 
 | `STORAGE_KEY` | `types.ts` | `chrome.storage.local` key for collected items |
 | `MEDIA_COLLECTOR_DIR` | `types.ts` | download subfolder name (`media-collector/`) |
 | `PLATFORM_LABELS` | `types.ts` | display labels for platforms |
-| `MessageType` | `types.ts` | string union of background message types (含 `RESTORE_ITEMS`) |
+| `MessageType` | `types.ts` | string union of background message types (含 `RESTORE_ITEMS`、`SHOW_DOWNLOADS_FOLDER`) |
 | `MessagePayloads` | `types.ts` | per-message payload type map |
 | `theme` | `popup-theme.ts` | popup UI 主题 token 唯一权威源(参见上面 Popup UI 表格) |
 | `localStorage.__mc_state__` | `lib/xhs-state-inject.ts` | synced `__INITIAL_STATE__`（详情页 SSR，cross-world） |
