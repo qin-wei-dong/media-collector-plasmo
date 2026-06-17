@@ -3,6 +3,14 @@
 export type MediaType = "image" | "video"
 export type Platform = "xiaohongshu" | "douyin" | "unknown"
 
+export interface Collection {
+  id: string
+  name: string
+  color: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface MediaItem {
   id: string
   url: string
@@ -21,6 +29,8 @@ export interface MediaItem {
   height?: number
   noteId?: string
   groupIndex?: number
+  collectionIds?: string[]
+  exportedAt?: string
 
   // UI 状态（不持久化）
   _selected?: boolean
@@ -36,6 +46,12 @@ export type MessageType =
   | "INJECT_MAIN_WORLD"
   | "REMOVE_ITEMS"
   | "RESTORE_ITEMS"
+  | "GET_COLLECTIONS"
+  | "CREATE_COLLECTION"
+  | "RENAME_COLLECTION"
+  | "DELETE_COLLECTION"
+  | "ASSIGN_COLLECTION"
+  | "UNASSIGN_COLLECTION"
 
 export interface MessagePayloads {
   COLLECT_MEDIA: {
@@ -49,6 +65,7 @@ export interface MessagePayloads {
     width?: number
     height?: number
     author?: string
+    coverUrl?: string
   }
   COLLECT_NOTE_IMAGES: {
     noteId: string
@@ -69,6 +86,12 @@ export interface MessagePayloads {
   GET_LAST_MEDIA: void
   REMOVE_ITEMS: string[]
   RESTORE_ITEMS: MediaItem[]
+  GET_COLLECTIONS: void
+  CREATE_COLLECTION: { name: string; color: string }
+  RENAME_COLLECTION: { id: string; name: string }
+  DELETE_COLLECTION: { id: string }
+  ASSIGN_COLLECTION: { itemIds: string[]; collectionId: string }
+  UNASSIGN_COLLECTION: { itemIds: string[]; collectionId: string }
 }
 
 export interface MessageResponse {
@@ -79,6 +102,8 @@ export interface MessageResponse {
   downloadId?: number
   count?: number
   errors?: string[]
+  collections?: Collection[]
+  collection?: Collection
   media?: {
     url: string
     type: MediaType
@@ -89,6 +114,7 @@ export interface MessageResponse {
 }
 
 export const STORAGE_KEY = "collected_media"
+export const COLLECTIONS_KEY = "collections"
 export const MEDIA_COLLECTOR_DIR = "media-collector"
 
 export const PLATFORM_LABELS: Record<Platform, string> = {

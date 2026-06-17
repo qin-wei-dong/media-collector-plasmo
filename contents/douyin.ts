@@ -39,11 +39,21 @@ function main() {
 
   const ui = new HoverUIManager({
     onCollect: (media) => {
-      doCollect(media.url, media.type)
+      doCollect(media.url, media.type, getCoverUrl(media.el, media.type))
     },
   })
 
-  function doCollect(url: string, type: string) {
+  function getCoverUrl(el: Element, type: string): string {
+    if (type !== "video") return ""
+    if (el instanceof HTMLVideoElement) return el.poster || ""
+    if (el instanceof HTMLImageElement) return el.currentSrc || el.src || ""
+    const video = el.querySelector("video")
+    if (video?.poster) return video.poster
+    const img = el.querySelector("img")
+    return img?.currentSrc || img?.src || ""
+  }
+
+  function doCollect(url: string, type: string, coverUrl = "") {
     ui.showCollected()
     if (!isContextValid()) {
       ui.resetCollectState()
@@ -60,6 +70,7 @@ function main() {
             title: extractTitle(),
             sourceUrl: location.href,
             author: extractDouyinAuthor(),
+            coverUrl: coverUrl || undefined,
           },
         },
         (resp) => {

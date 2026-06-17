@@ -13,6 +13,7 @@ export interface XHSNoteMedia {
   type: "image" | "video"
   images: XHSImage[]
   videoUrl: string | null
+  coverUrl?: string
   title: string
   author: string
 }
@@ -50,6 +51,70 @@ function extractUrlFromVideoObj(video: any): string | null {
   return video?.url || null
 }
 
+function normalizeCoverUrl(value: string): string {
+  const url = value.trim()
+  if (!/^https?:\/\//.test(url)) return ""
+  if (url.startsWith("data:") || url.startsWith("blob:")) return ""
+  return url.replace(/\?imageView2.*$/, "")
+}
+
+function isVideoUrl(url: string): boolean {
+  const lower = url.toLowerCase()
+  return (
+    /\.(mp4|m3u8|mov|flv)(?:[?#]|$)/.test(lower) ||
+    lower.includes("sns-video") ||
+    lower.includes("/video/") ||
+    lower.includes("video/tos")
+  )
+}
+
+function scoreCoverUrl(url: string, path: string): number {
+  const lowerUrl = url.toLowerCase()
+  const lowerPath = path.toLowerCase()
+  if (isVideoUrl(lowerUrl)) return -1
+  if (lowerPath.includes("avatar") || lowerUrl.includes("sns-avatar") || lowerUrl.includes("/avatar/")) return -1
+
+  let score = 0
+  if (/cover|poster|thumbnail|thumb|first[_-]?frame|preview/.test(lowerPath)) score += 80
+  if (/image|img|pic|photo/.test(lowerPath)) score += 40
+  if (/image|img|webpic|sns-img|sns-webpic/.test(lowerUrl)) score += 30
+  if (/image[_-]?list|imagelist|images/.test(lowerPath)) score += 20
+  return score
+}
+
+function extractCoverUrlFromVideoObj(video: any, entry?: any): string {
+  const roots = [video, entry?.noteCard, entry?.note_card, entry]
+  const seen = new Set<any>()
+  const candidates: Array<{ url: string; score: number; order: number }> = []
+  let order = 0
+
+  function visit(value: any, path: string, depth: number) {
+    if (value == null || depth > 7) return
+    if (typeof value === "string") {
+      const url = normalizeCoverUrl(value)
+      if (!url) return
+      const score = scoreCoverUrl(url, path)
+      if (score > 0) candidates.push({ url, score, order: order++ })
+      return
+    }
+    if (typeof value !== "object" || seen.has(value)) return
+    seen.add(value)
+
+    if (Array.isArray(value)) {
+      value.forEach((item, index) => visit(item, `${path}[${index}]`, depth + 1))
+      return
+    }
+
+    for (const [key, child] of Object.entries(value)) {
+      visit(child, path ? `${path}.${key}` : key, depth + 1)
+    }
+  }
+
+  roots.forEach((root, index) => visit(root, index === 0 ? "video" : `entry${index}`, 0))
+  candidates.sort((a, b) => b.score - a.score || a.order - b.order)
+  return candidates[0]?.url || ""
+}
+
 /**
  * 提取指定笔记的媒体数据。
  * 优先读 API 拦截缓存(首页浮层场景);回退 __INITIAL_STATE__(独立详情页 SSR)。
@@ -83,7 +148,16 @@ export function getNoteMediaFromState(noteId: string): XHSNoteMedia | null {
     ""
 
   const videoUrl = entry.video ? extractUrlFromVideoObj(entry.video) : null
-  if (videoUrl) return { type: "video", images: [], videoUrl, title, author }
+  if (videoUrl) {
+    return {
+      type: "video",
+      images: [],
+      videoUrl,
+      coverUrl: extractCoverUrlFromVideoObj(entry.video, entry),
+      title,
+      author,
+    }
+  }
 
   const imageList =
     entry.imageList ||
