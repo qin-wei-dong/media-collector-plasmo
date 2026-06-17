@@ -269,6 +269,7 @@ function Popup() {
       {
         type: "BATCH_DOWNLOAD",
         payload: selected.map((i) => ({
+          id: i.id,
           url: i.url,
           filename: buildFilename(i),
           platform: i.platform,

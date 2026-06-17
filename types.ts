@@ -52,6 +52,7 @@ export type MessageType =
   | "DELETE_COLLECTION"
   | "ASSIGN_COLLECTION"
   | "UNASSIGN_COLLECTION"
+  | "SHOW_DOWNLOADS_FOLDER"
 
 export interface MessagePayloads {
   COLLECT_MEDIA: {
@@ -82,7 +83,7 @@ export interface MessagePayloads {
   }
   GET_ITEMS: void
   CLEAR_ITEMS: void
-  BATCH_DOWNLOAD: Array<{ url: string; filename: string; platform?: Platform }>
+  BATCH_DOWNLOAD: Array<{ id?: string; url: string; filename: string; platform?: Platform }>
   GET_LAST_MEDIA: void
   REMOVE_ITEMS: string[]
   RESTORE_ITEMS: MediaItem[]
@@ -92,6 +93,7 @@ export interface MessagePayloads {
   DELETE_COLLECTION: { id: string }
   ASSIGN_COLLECTION: { itemIds: string[]; collectionId: string }
   UNASSIGN_COLLECTION: { itemIds: string[]; collectionId: string }
+  SHOW_DOWNLOADS_FOLDER: void
 }
 
 export interface MessageResponse {
@@ -102,6 +104,9 @@ export interface MessageResponse {
   downloadId?: number
   count?: number
   errors?: string[]
+  folder?: string
+  folders?: string[]
+  exportedIds?: string[]
   collections?: Collection[]
   collection?: Collection
   media?: {
