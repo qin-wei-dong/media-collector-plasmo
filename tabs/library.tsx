@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { Collection, MediaItem, MediaType, Platform } from "../types"
+import type { Collection, ExportHistoryEntry, MediaItem, MediaType, Platform } from "../types"
 import { PLATFORM_LABELS } from "../types"
 import { getTimeBucket, TIME_ORDER, type ThemeTokens } from "../lib/design-tokens"
 import { ThemeProvider, useTheme } from "../lib/use-theme"
@@ -183,7 +183,26 @@ function LibraryPage() {
   const [sortDesc, setSortDesc] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
+  // loadHistory 启动时拉一次(挂在主 useEffect 内)
   const [notice, setNotice] = useState<Notice | null>(null)
+  // M6 Task 4:导出历史 modal
+  const [history, setHistory] = useState<ExportHistoryEntry[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const loadHistory = useCallback(() => {
+    try {
+      chrome.runtime.sendMessage({ type: "GET_EXPORT_HISTORY" }, (resp) => {
+        if (chrome.runtime.lastError || !resp?.success) return
+        setHistory((resp.history as ExportHistoryEntry[]) || [])
+      })
+    } catch {
+      // 防御性兜底:即使 sendMessage 抛错也不影响库页
+    }
+  }, [])
+  // 历史有失败项的总和(用于按钮角标)
+  const failedHistoryCount = useMemo(
+    () => history.reduce((sum, h) => sum + (h.failedCount || 0), 0),
+    [history]
+  )
   const [dialog, setDialog] = useState<DialogState>(null)
   const [batchDownloading, setBatchDownloading] = useState(false)
   // M6 Task 2:渐进渲染——只渲染前 N 项,滚动接近底部再追加
@@ -228,99 +247,93 @@ function LibraryPage() {
   useEffect(() => {
     loadItems()
     loadCollections()
-  }, [loadCollections, loadItems])
+    loadHistory()
+  }, [loadCollections, loadItems, loadHistory])
 
   // M5 Task 4 + M6 Task 6:库页快捷键补齐
-  // - Cmd/Ctrl+K 聚焦搜索(已存在)
-  // - Esc 优先级 对话框 > 预览 > 搜索(已存在)
-  // - Cmd/Ctrl+A 全选当前筛选结果(输入态不拦截)
-  // - Delete/Backspace 删除选中(输入态不拦截,走撤销 Toast)
-  // - E 导出选中(非输入态)
-  // - C 打开加入收藏夹 / 移动到收藏夹 dialog(非输入态)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null
-      const isTyping =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable === true
+  // 用 handlerRef 模式避免 useEffect deps 数组引用未初始化的 const(TDZ)
+  // - Cmd/Ctrl+K 聚焦搜索(任何时候)
+  // - Esc 优先级 对话框 > 预览 > 搜索
+  // - Cmd/Ctrl+A 全选(输入态不拦截)
+  // - Delete/Backspace 删除(走撤销 Toast,输入态不拦截)
+  // - E 导出(非输入态)
+  // - C 打开加入收藏夹 dialog(非输入态)
+  const keyboardHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {})
+  keyboardHandlerRef.current = (e: KeyboardEvent) => {
+    const target = e.target as HTMLElement | null
+    const isTyping =
+      target?.tagName === "INPUT" ||
+      target?.tagName === "TEXTAREA" ||
+      target?.isContentEditable === true
 
-      // Cmd/Ctrl+K:聚焦搜索(任何时候都生效,即使是输入态,因为这是"打开搜索"的快捷键)
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    // Cmd/Ctrl+K:聚焦搜索(任何时候都生效)
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+      e.preventDefault()
+      searchRef.current?.focus()
+      return
+    }
+
+    // Esc:关闭对话框 > 关闭预览 > 清空搜索
+    if (e.key === "Escape") {
+      if (dialog) {
         e.preventDefault()
-        searchRef.current?.focus()
+        setDialog(null)
         return
       }
-
-      // Esc:关闭对话框 > 关闭预览 > 清空搜索(优先级)
-      if (e.key === "Escape") {
-        if (dialog) {
-          e.preventDefault()
-          setDialog(null)
-          return
-        }
-        if (previewItem) {
-          e.preventDefault()
-          setPreviewItem(null)
-          return
-        }
-        if (document.activeElement === searchRef.current) {
-          e.preventDefault()
-          setSearch("")
-          searchRef.current?.blur()
-        }
-        return
-      }
-
-      // 输入态下,以下快捷键全部不拦截,避免污染文本编辑
-      if (isTyping) return
-
-      // Cmd/Ctrl+A:全选当前筛选结果
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+      if (previewItem) {
         e.preventDefault()
-        toggleSelectAll()
+        setPreviewItem(null)
         return
       }
-
-      // Delete / Backspace:删除选中(走撤销 Toast,非永久执行)
-      if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedCount > 0 && !batchDownloading) {
-          e.preventDefault()
-          removeSelected()
-        }
-        return
+      if (document.activeElement === searchRef.current) {
+        e.preventDefault()
+        setSearch("")
+        searchRef.current?.blur()
       }
+      return
+    }
 
-      // E:导出选中(非输入态)
-      if (e.key === "e" || e.key === "E") {
-        if (selectedCount > 0 && !batchDownloading) {
-          e.preventDefault()
-          downloadItems(selectedItems)
-        }
-        return
+    // 输入态下,以下快捷键全部不拦截
+    if (isTyping) return
+
+    // Cmd/Ctrl+A:全选当前筛选结果
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+      e.preventDefault()
+      toggleSelectAll()
+      return
+    }
+
+    // Delete / Backspace:删除选中(走撤销 Toast)
+    if (e.key === "Delete" || e.key === "Backspace") {
+      if (selectedCount > 0 && !batchDownloading) {
+        e.preventDefault()
+        removeSelected()
       }
+      return
+    }
 
-      // C:打开加入收藏夹 / 移动到收藏夹 dialog(非输入态)
-      if (e.key === "c" || e.key === "C") {
-        if (selectedCount > 0) {
-          e.preventDefault()
-          setDialog(collections.length ? { type: "assign" } : { type: "create" })
-        }
+    // E:导出选中
+    if (e.key === "e" || e.key === "E") {
+      if (selectedCount > 0 && !batchDownloading) {
+        e.preventDefault()
+        downloadItems(selectedItems)
+      }
+      return
+    }
+
+    // C:打开加入收藏夹 / 移动到收藏夹 dialog
+    if (e.key === "c" || e.key === "C") {
+      if (selectedCount > 0) {
+        e.preventDefault()
+        setDialog(collections.length ? { type: "assign" } : { type: "create" })
       }
     }
+  }
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyboardHandlerRef.current(e)
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [
-    dialog,
-    previewItem,
-    selectedCount,
-    batchDownloading,
-    collections.length,
-    toggleSelectAll,
-    removeSelected,
-    downloadItems,
-    selectedItems,
-  ])
+  }, [])
 
   // 切换任何筛选(范围/平台/收藏夹/类型/搜索)时清空选中:
   // selectedItems 基于全量 items,不清空则被隐藏的素材仍会随导出带出、"已选 N 项"也会失真。
@@ -911,6 +924,28 @@ function LibraryPage() {
             />
           </div>
           <div style={styles.toolbarSpacer} />
+          {/* M6 Task 4:导出历史按钮 — 带失败数角标(失败时高亮) */}
+          <button
+            className="mc-library-button"
+            style={{
+              ...styles.toolbarButton,
+              ...(failedHistoryCount > 0 ? styles.toolbarButtonAlert : {}),
+            }}
+            onClick={() => {
+              loadHistory()
+              setShowHistory(true)
+            }}
+            aria-label={`导出历史,共 ${history.length} 条${failedHistoryCount ? `, ${failedHistoryCount} 项失败` : ""}`}
+          >
+            <Icon name="clock" size={15} />
+            导出历史
+            {history.length > 0 && (
+              <span style={styles.toolbarBadge}>{history.length}</span>
+            )}
+            {failedHistoryCount > 0 && (
+              <span style={styles.toolbarBadgeAlert}>!</span>
+            )}
+          </button>
           <button
             className="mc-library-button"
             style={styles.toolbarButton}
@@ -1112,6 +1147,39 @@ function LibraryPage() {
           siblings={previewSiblings}
           onClose={() => setPreviewItem(null)}
           onNavigate={setPreviewItem}
+        />
+      )}
+
+      {/* M6 Task 4:导出历史 modal */}
+      {showHistory && (
+        <ExportHistoryModal
+          history={history}
+          onClose={() => setShowHistory(false)}
+          onRetry={(files) => {
+            setShowHistory(false)
+            chrome.runtime.sendMessage(
+              { type: "RETRY_EXPORT_FAILED", payload: { files } },
+              (resp) => {
+                if (resp?.success) {
+                  const ok = resp.count ?? files.length
+                  const failed = resp.errors?.length ?? 0
+                  setNotice({
+                    kind: failed > 0 ? "info" : "success",
+                    message: failed > 0 ? `重试完成 ${ok}/${files.length} 成功` : `重试完成 ${ok} 项`,
+                  })
+                } else {
+                  setNotice({ kind: "error", message: resp?.error || "重试失败" })
+                }
+                loadHistory()
+              }
+            )
+          }}
+          onClear={() => {
+            chrome.runtime.sendMessage({ type: "CLEAR_EXPORT_HISTORY" }, () => {
+              setHistory([])
+              setNotice({ kind: "success", message: "已清空导出历史" })
+            })
+          }}
         />
       )}
 
@@ -1677,6 +1745,127 @@ function CollectionDialog({
   )
 }
 
+// M6 Task 4:导出历史 modal
+function ExportHistoryModal({
+  history,
+  onClose,
+  onRetry,
+  onClear,
+}: {
+  history: ExportHistoryEntry[]
+  onClose: () => void
+  onRetry: (files: Array<{ id?: string; url: string; filename: string; platform?: Platform }>) => void
+  onClear: () => void
+}) {
+  const theme = useTheme()
+  const styles = useMemo(() => makeStyles(theme), [theme])
+  // Esc 关闭
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation()
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener("keydown", onKey, { capture: true })
+    return () => window.removeEventListener("keydown", onKey, { capture: true })
+  }, [onClose])
+
+  // 仅展示最近 10 条
+  const recent = history.slice(0, 10)
+  const totalFailed = history.reduce((s, h) => s + (h.failedCount || 0), 0)
+
+  return (
+    <div style={styles.dialogOverlay} onClick={onClose}>
+      <div
+        style={{ ...styles.dialog, maxWidth: 520, width: "90vw", maxHeight: "80vh", display: "flex", flexDirection: "column" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={styles.dialogHead}>
+          <div style={styles.dialogTitle}>
+            导出历史
+            <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: "inherit", opacity: 0.6 }}>
+              共 {history.length} 条{totalFailed > 0 ? `, ${totalFailed} 项失败` : ""}
+            </span>
+          </div>
+          <button style={styles.dialogClose} onClick={onClose} aria-label="关闭">×</button>
+        </div>
+
+        {recent.length === 0 ? (
+          <div style={styles.dialogEmpty}>还没有导出记录</div>
+        ) : (
+          <div style={{ overflowY: "auto", flex: 1, padding: "0 4px" }}>
+            {recent.map((entry) => (
+              <div key={entry.id} style={styles.historyItem}>
+                <div style={styles.historyItemHead}>
+                  <span style={styles.historyTime}>
+                    {new Date(entry.createdAt).toLocaleString("zh-CN", { hour12: false })}
+                  </span>
+                  <span
+                    style={{
+                      ...styles.historyStatus,
+                      ...(entry.failedCount > 0 ? styles.historyStatusPartial : styles.historyStatusOk),
+                    }}
+                  >
+                    {entry.failedCount > 0 ? `部分失败 ${entry.successCount}/${entry.total}` : `✓ ${entry.total} 项`}
+                  </span>
+                </div>
+                {entry.folders.length > 0 && (
+                  <div style={styles.historyFolders}>
+                    {entry.folders.map((f) => (
+                      <span key={f} style={styles.historyFolder}>📁 {f}</span>
+                    ))}
+                  </div>
+                )}
+                {entry.failedFiles && entry.failedFiles.length > 0 && (
+                  <div style={styles.historyFailed}>
+                    {entry.failedFiles.slice(0, 3).map((f, i) => (
+                      <div key={i} style={styles.historyFailedItem}>
+                        <span style={styles.historyFailedName}>{f.filename}</span>
+                        <span style={styles.historyFailedError}>{f.error}</span>
+                      </div>
+                    ))}
+                    {entry.failedFiles.length > 3 && (
+                      <div style={styles.historyFailedMore}>还有 {entry.failedFiles.length - 3} 项失败…</div>
+                    )}
+                    <button
+                      className="mc-library-button"
+                      style={styles.historyRetryBtn}
+                      onClick={() => onRetry(entry.failedFiles!)}
+                    >
+                      重试失败项
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {history.length > 0 && (
+          <div style={{ ...styles.dialogActions, padding: "12px 0 0", borderTop: `0.5px solid ${theme.hairline}` }}>
+            <button
+              className="mc-library-button"
+              style={styles.dialogGhost}
+              onClick={() => {
+                if (window.confirm(`清空所有 ${history.length} 条导出历史?此操作不可撤销。`)) {
+                  onClear()
+                }
+              }}
+            >
+              清空历史
+            </button>
+            <button className="mc-library-button" style={styles.dialogPrimary} onClick={onClose}>
+              关闭
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function LibraryToast({ notice, onDismiss }: { notice: Notice; onDismiss: () => void }) {
   const theme = useTheme()
   const styles = useMemo(() => makeStyles(theme), [theme])
@@ -2016,6 +2205,113 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       alignItems: "center",
       gap: 7,
       whiteSpace: "nowrap",
+    },
+    // M6 Task 4:导出历史按钮 alert 态(有失败项时)
+    toolbarButtonAlert: {
+      color: theme.danger ?? "#FF453A",
+    },
+    toolbarBadge: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: textTertiary,
+      background: "rgba(255,255,255,0.10)",
+      borderRadius: theme.r.pill,
+      padding: "1px 6px",
+      minWidth: 18,
+      textAlign: "center",
+    },
+    toolbarBadgeAlert: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#fff",
+      background: theme.danger ?? "#FF453A",
+      borderRadius: theme.r.pill,
+      padding: "0 5px",
+      minWidth: 16,
+      textAlign: "center",
+    },
+    // M6 Task 4:导出历史 modal
+    historyItem: {
+      padding: "12px 0",
+      borderBottom: `0.5px solid ${theme.hairline}`,
+    },
+    historyItemHead: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 6,
+    },
+    historyTime: {
+      fontSize: 12,
+      color: textTertiary,
+    },
+    historyStatus: {
+      fontSize: 12,
+      fontWeight: 600,
+      padding: "2px 8px",
+      borderRadius: theme.r.pill,
+    },
+    historyStatusOk: {
+      color: "#30d158",
+      background: "rgba(48,209,88,0.15)",
+    },
+    historyStatusPartial: {
+      color: "#FF9F0A",
+      background: "rgba(255,159,10,0.15)",
+    },
+    historyFolders: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 6,
+    },
+    historyFolder: {
+      fontSize: 11,
+      color: textSecondary,
+      background: card,
+      border: `0.5px solid ${theme.hairline}`,
+      borderRadius: theme.r.pill,
+      padding: "2px 8px",
+    },
+    historyFailed: {
+      marginTop: 6,
+      padding: 8,
+      background: "rgba(255,69,58,0.08)",
+      border: `0.5px solid rgba(255,69,58,0.3)`,
+      borderRadius: theme.r.sm,
+    },
+    historyFailedItem: {
+      display: "flex",
+      justifyContent: "space-between",
+      fontSize: 11,
+      color: textSecondary,
+      marginBottom: 2,
+    },
+    historyFailedName: {
+      flex: 1,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+    historyFailedError: {
+      color: theme.danger ?? "#FF453A",
+      marginLeft: 8,
+    },
+    historyFailedMore: {
+      fontSize: 11,
+      color: textTertiary,
+      marginTop: 4,
+    },
+    historyRetryBtn: {
+      marginTop: 8,
+      padding: "5px 12px",
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#fff",
+      background: theme.accent,
+      border: "none",
+      borderRadius: theme.r.sm,
+      cursor: "pointer",
     },
     viewToggle: {
       display: "flex",

@@ -1,5 +1,5 @@
 // background/storage.ts — 存储 CRUD 操作
-import { type MediaItem, STORAGE_KEY } from "../types"
+import { type ExportHistoryEntry, type MediaItem, EXPORT_HISTORY_KEY, EXPORT_HISTORY_MAX, STORAGE_KEY } from "../types"
 
 // Write lock: serialize all write operations to prevent race conditions
 let writeQueue: Promise<void> = Promise.resolve()
@@ -174,6 +174,54 @@ export function markItemsExported(
           resolve({ success: true, updated })
         })
       }).catch(reject)
+    })
+  )
+}
+
+// ===== M6 Task 4:导出历史 =====
+
+export function getExportHistory(): Promise<ExportHistoryEntry[]> {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.get(EXPORT_HISTORY_KEY, (result) => {
+      if (chrome.runtime.lastError) {
+        reject(new Error(chrome.runtime.lastError.message))
+        return
+      }
+      resolve((result[EXPORT_HISTORY_KEY] as ExportHistoryEntry[]) || [])
+    })
+  })
+}
+
+export function appendExportHistory(entry: ExportHistoryEntry): Promise<{ success: boolean }> {
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getExportHistory()
+        .then((history) => {
+          // 新的 unshift,保留最近 N 条
+          const next = [entry, ...history].slice(0, EXPORT_HISTORY_MAX)
+          chrome.storage.local.set({ [EXPORT_HISTORY_KEY]: next }, () => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message))
+              return
+            }
+            resolve({ success: true })
+          })
+        })
+        .catch(reject)
+    })
+  )
+}
+
+export function clearExportHistory(): Promise<{ success: boolean }> {
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      chrome.storage.local.set({ [EXPORT_HISTORY_KEY]: [] }, () => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message))
+          return
+        }
+        resolve({ success: true })
+      })
     })
   )
 }
