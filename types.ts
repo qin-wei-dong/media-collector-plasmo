@@ -55,6 +55,10 @@ export type MessageType =
   | "DELETE_COLLECTION"
   | "ASSIGN_COLLECTION"
   | "UNASSIGN_COLLECTION"
+  | "UPDATE_COLLECTION_COLOR"
+  | "REORDER_COLLECTIONS"
+  | "PIN_COLLECTION"
+  | "MOVE_COLLECTION_ITEMS"
   | "SHOW_DOWNLOADS_FOLDER"
 
 export interface MessagePayloads {
@@ -96,6 +100,10 @@ export interface MessagePayloads {
   DELETE_COLLECTION: { id: string }
   ASSIGN_COLLECTION: { itemIds: string[]; collectionId: string }
   UNASSIGN_COLLECTION: { itemIds: string[]; collectionId: string }
+  UPDATE_COLLECTION_COLOR: { id: string; color: string }
+  REORDER_COLLECTIONS: { orderedIds: string[] }
+  PIN_COLLECTION: { id: string; pinned: boolean }
+  MOVE_COLLECTION_ITEMS: { itemIds: string[]; fromCollectionId: string; toCollectionId: string }
   SHOW_DOWNLOADS_FOLDER: void
 }
 
