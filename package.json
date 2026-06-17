@@ -23,6 +23,7 @@
     "typescript": "^5"
   },
   "manifest": {
+    "action": {},
     "host_permissions": [
       "https://www.xiaohongshu.com/*",
       "https://www.douyin.com/*"
