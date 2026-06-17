@@ -88,6 +88,21 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   })
 })
 
+// ====== Action 点击 → 打开 library 全屏 tab ======
+// v2.1.0 起删 popup 弹窗(M6 后 popup 是 library 的严格子集,冗余),点击图标直接打开工作台
+chrome.action.onClicked.addListener(() => {
+  const libraryUrl = chrome.runtime.getURL("tabs/library.html")
+  chrome.tabs.query({ url: libraryUrl }, (tabs) => {
+    if (tabs[0]?.id) {
+      // 已开 library tab → 聚焦
+      chrome.tabs.update(tabs[0].id, { active: true })
+    } else {
+      // 未开 → 新建
+      chrome.tabs.create({ url: libraryUrl })
+    }
+  })
+})
+
 // ====== 快捷键 ======
 chrome.commands.onCommand.addListener((command) => {
   if (command !== "collect_media") return
