@@ -42,6 +42,50 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }
 
+// M6 Task 5 前置:旧 collection 缺 sortOrder/pinned 时,按 createdAt 倒序 lazy 写回
+// 写入走 enqueueWrite;只触发一次(全量检查 needsMigration),保证向后兼容
+function migrateCollections(): Promise<void> {
+  return enqueueWrite(() =>
+    new Promise((resolve, reject) => {
+      getCollections()
+        .then((collections) => {
+          if (!collections.length) {
+            resolve()
+            return
+          }
+          // 任一 collection 缺 sortOrder 即触发迁移
+          const needsMigration = collections.some((c) => c.sortOrder === undefined)
+          if (!needsMigration) {
+            resolve()
+            return
+          }
+          // 旧 collection 按 createdAt 倒序,缺的 sortOrder 从 0 开始递增
+          // pinned 字段缺失补默认 false
+          const sortedByCreated = [...collections].sort(
+            (a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)
+          )
+          const orderMap = new Map<string, number>()
+          let nextOrder = 0
+          for (const c of sortedByCreated) {
+            if (c.sortOrder === undefined) {
+              orderMap.set(c.id, nextOrder)
+              nextOrder += 1
+            }
+          }
+          const next = collections.map((c) => ({
+            ...c,
+            sortOrder: c.sortOrder ?? orderMap.get(c.id) ?? 0,
+            pinned: c.pinned ?? false,
+          }))
+          setCollections(next)
+            .then(() => resolve())
+            .catch(reject)
+        })
+        .catch(reject)
+    })
+  )
+}
+
 export function ensureCollectionsInitialized(): Promise<void> {
   return enqueueWrite(() =>
     new Promise((resolve, reject) => {
@@ -63,7 +107,7 @@ export function ensureCollectionsInitialized(): Promise<void> {
         })
       })
     })
-  )
+  ).then(() => migrateCollections())
 }
 
 export function listCollections(): Promise<Collection[]> {
@@ -83,12 +127,20 @@ export function createCollection(name: string, color: string): Promise<{ success
             return
           }
           const now = new Date().toISOString()
+          // M6 Task 5:新 collection 显式赋 sortOrder = max+1(放最后),pinned = false
+          // 避免下次 migrateCollections 重复触发(虽然幂等,但避免无效写)
+          const maxOrder = collections.reduce(
+            (max, c) => Math.max(max, c.sortOrder ?? -1),
+            -1
+          )
           const collection: Collection = {
             id: generateId(),
             name: trimmed,
             color,
             createdAt: now,
             updatedAt: now,
+            sortOrder: maxOrder + 1,
+            pinned: false,
           }
           const next = [collection, ...collections]
           setCollections(next)

@@ -9,6 +9,9 @@ export interface Collection {
   color: string
   createdAt: string
   updatedAt: string
+  // M6 Task 5 字段:旧 collection 可能缺失,migrateCollections() 会按 createdAt 倒序 lazy 写回
+  sortOrder?: number
+  pinned?: boolean
 }
 
 export interface MediaItem {
