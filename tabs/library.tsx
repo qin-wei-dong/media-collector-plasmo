@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Collection, MediaItem, MediaType, Platform } from "../types"
 import { PLATFORM_LABELS } from "../types"
 import { getTimeBucket, TIME_ORDER, type ThemeTokens } from "../lib/design-tokens"
@@ -7,6 +7,14 @@ import { PreviewModal } from "../components/PreviewModal"
 
 type Scope = "all" | "recent" | "uncategorized"
 type ViewMode = "grid" | "list"
+
+// M6 Task 3:预计算字段 — items 一次性派生,下游 useMemo 复用,避免重复 new Date()/字符串拼
+// 内部计算字段以下划线开头,不入 storage(纯内存对象,源自 useMemo)
+type EnrichedItem = MediaItem & {
+  _collectedAtMs: number
+  _timeBucket: string
+  _searchHaystack: string
+}
 
 // M6 Task 2:渐进渲染配置
 const INITIAL_RENDER_COUNT = 160
@@ -272,9 +280,21 @@ function LibraryPage() {
     })
   }, [items])
 
+  // M6 Task 3:预计算 — items 变化时一次性算出 collectedAtMs / timeBucket / searchHaystack
+  // 下游 useMemo(stats / authors / filteredItems / sortedItems / buckets / visibleBuckets)复用,避免重复 new Date()
+  const enrichedItems = useMemo<EnrichedItem[]>(() => {
+    return items.map((item) => ({
+      ...item,
+      _collectedAtMs: +new Date(item.collectedAt),
+      _timeBucket: getTimeBucket(item.collectedAt),
+      _searchHaystack: `${item.title || ""} ${item.author || ""}`.toLowerCase(),
+    }))
+  }, [items])
+
   const authors = useMemo(() => {
     const map = new Map<string, { name: string; count: number; first: MediaItem }>()
-    const sorted = [...items].sort((a, b) => +new Date(b.collectedAt) - +new Date(a.collectedAt))
+    // M6 Task 3:用 enrichedItems._collectedAtMs 替代 +new Date
+    const sorted = [...enrichedItems].sort((a, b) => b._collectedAtMs - a._collectedAtMs)
     for (const item of sorted) {
       const key = item.author || ""
       const current = map.get(key)
@@ -282,7 +302,7 @@ function LibraryPage() {
       else map.set(key, { name: key, count: 1, first: item })
     }
     return [...map.values()].sort((a, b) => (a.name === "" ? 1 : b.name === "" ? -1 : b.count - a.count))
-  }, [items])
+  }, [enrichedItems])
 
   const stats = useMemo(() => {
     const now = new Date()
@@ -295,8 +315,9 @@ function LibraryPage() {
     let videos = 0
     let exportedThisWeek = 0
 
-    for (const item of items) {
-      const collectedAt = +new Date(item.collectedAt)
+    // M6 Task 3:用 enrichedItems._collectedAtMs 替代 +new Date(item.collectedAt)
+    for (const item of enrichedItems) {
+      const collectedAt = item._collectedAtMs
       if (collectedAt >= todayStart) today += 1
       else if (collectedAt >= yesterdayStart) yesterday += 1
       if (item.type === "video") videos += 1
@@ -320,13 +341,14 @@ function LibraryPage() {
   }, [items, authors])
 
   const sidebarCounts = useMemo(() => {
+    // M6 Task 3:用 enrichedItems 复用 _timeBucket,避免重复 getTimeBucket 调用
     return {
-      recent: items.filter((item) => getTimeBucket(item.collectedAt) === "今天").length,
-      uncategorized: items.filter((item) => !item.collectionIds?.length).length,
-      xhs: items.filter((item) => item.platform === "xiaohongshu").length,
-      douyin: items.filter((item) => item.platform === "douyin").length,
+      recent: enrichedItems.filter((item) => item._timeBucket === "今天").length,
+      uncategorized: enrichedItems.filter((item) => !item.collectionIds?.length).length,
+      xhs: enrichedItems.filter((item) => item.platform === "xiaohongshu").length,
+      douyin: enrichedItems.filter((item) => item.platform === "douyin").length,
     }
-  }, [items])
+  }, [enrichedItems])
 
   const collectionCounts = useMemo(() => {
     const map = new Map<string, number>()
@@ -348,34 +370,33 @@ function LibraryPage() {
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return items.filter((item) => {
-      if (scope === "recent" && getTimeBucket(item.collectedAt) !== "今天") return false
+    // M6 Task 3:用 enrichedItems 复用 _timeBucket / _searchHaystack,避免每个 item 重复 getTimeBucket + 拼字符串
+    return enrichedItems.filter((item) => {
+      if (scope === "recent" && item._timeBucket !== "今天") return false
       if (scope === "uncategorized" && item.collectionIds?.length) return false
       if (collectionFilter && !item.collectionIds?.includes(collectionFilter)) return false
       if (platformFilter && item.platform !== platformFilter) return false
       if (typeFilter && item.type !== typeFilter) return false
-      if (q) {
-        const haystack = `${item.title || ""} ${item.author || ""}`.toLowerCase()
-        if (!haystack.includes(q)) return false
-      }
+      if (q && !item._searchHaystack.includes(q)) return false
       return true
     })
-  }, [collectionFilter, items, platformFilter, scope, search, typeFilter])
+  }, [collectionFilter, enrichedItems, platformFilter, scope, search, typeFilter])
 
   const sortedItems = useMemo(() => {
+    // M6 Task 3:用 _collectedAtMs 替代 +new Date(...)
     return [...filteredItems].sort((a, b) => {
-      const diff = +new Date(b.collectedAt) - +new Date(a.collectedAt)
+      const diff = b._collectedAtMs - a._collectedAtMs
       return sortDesc ? diff : -diff
     })
   }, [filteredItems, sortDesc])
 
   const buckets = useMemo(() => {
-    const map = new Map<string, MediaItem[]>()
+    // M6 Task 3:用 _timeBucket 替代 getTimeBucket(item.collectedAt)
+    const map = new Map<string, EnrichedItem[]>()
     for (const item of sortedItems) {
-      const bucket = getTimeBucket(item.collectedAt)
-      const arr = map.get(bucket)
+      const arr = map.get(item._timeBucket)
       if (arr) arr.push(item)
-      else map.set(bucket, [item])
+      else map.set(item._timeBucket, [item])
     }
     return map
   }, [sortedItems])
@@ -383,12 +404,12 @@ function LibraryPage() {
   // M6 Task 2:渐进渲染——只渲染前 renderLimit 项
   const visibleItems = useMemo(() => sortedItems.slice(0, renderLimit), [sortedItems, renderLimit])
   const visibleBuckets = useMemo(() => {
-    const map = new Map<string, MediaItem[]>()
+    // M6 Task 3:用 _timeBucket 替代 getTimeBucket(item.collectedAt)
+    const map = new Map<string, EnrichedItem[]>()
     for (const item of visibleItems) {
-      const bucket = getTimeBucket(item.collectedAt)
-      const arr = map.get(bucket)
+      const arr = map.get(item._timeBucket)
       if (arr) arr.push(item)
-      else map.set(bucket, [item])
+      else map.set(item._timeBucket, [item])
     }
     return map
   }, [visibleItems])
@@ -556,6 +577,14 @@ function LibraryPage() {
     if (!item.sourceUrl) return
     chrome.tabs.create({ url: item.sourceUrl, active: false })
   }
+
+  // M6 Task 3:稳定 callback(给 LibraryCell / LibraryRow 用),让 React.memo 真正生效
+  // 4 个 callback 接受 item 参数,内部直接调用原函数,引用稳定 → 父级 re-render 时子组件不重渲染
+  // 依赖 [] 是安全的:内部用 setSelectedIds / chrome.runtime.sendMessage / chrome.tabs.create,都是稳定 API,stale closure 无害
+  const handlePreviewItem = useCallback((item: MediaItem) => setPreviewItem(item), [])
+  const handleToggleItem = useCallback((item: MediaItem) => toggleItem(item), [])
+  const handleDownloadOne = useCallback((item: MediaItem) => downloadItems([item]), [])
+  const handleOpenSource = useCallback((item: MediaItem) => openSource(item), [])
 
   const createCollection = (name: string, color: string) => {
     chrome.runtime.sendMessage({ type: "CREATE_COLLECTION", payload: { name, color } }, (resp) => {
@@ -891,10 +920,10 @@ function LibraryPage() {
                         item={item}
                         selected={selectedIds.has(item.id)}
                         imageCount={item.noteId ? noteImageCounts.get(item.noteId) : undefined}
-                        onPreview={() => setPreviewItem(item)}
-                        onToggleSelect={() => toggleItem(item)}
-                        onDownload={() => downloadItems([item])}
-                        onOpenSource={() => openSource(item)}
+                        onPreview={handlePreviewItem}
+                        onToggleSelect={handleToggleItem}
+                        onDownload={handleDownloadOne}
+                        onOpenSource={handleOpenSource}
                       />
                     ))}
                   </div>
@@ -908,8 +937,8 @@ function LibraryPage() {
                   key={item.id}
                   item={item}
                   selected={selectedIds.has(item.id)}
-                  onPreview={() => setPreviewItem(item)}
-                  onToggleSelect={() => toggleItem(item)}
+                  onPreview={handlePreviewItem}
+                  onToggleSelect={handleToggleItem}
                 />
               ))}
             </div>
@@ -1008,10 +1037,22 @@ function LibraryPage() {
     onDelete?: () => void
   }) {
     return (
-      <button
+      // M6 Task 3 修复:外层用 div + role=button,避免 button 嵌套 button(改/删)
+      // 原 <button> 包裹两个 <button> 违反 HTML 规范,React 报 validateDOMNesting 警告
+      // div + role=button + tabIndex + Enter/Space 与 LibraryCell / LibraryRow 保持一致
+      <div
         className="mc-library-button"
         style={{ ...styles.sidebarItem, ...(active ? styles.sidebarItemActive : {}) }}
+        role="button"
+        tabIndex={0}
+        aria-pressed={active}
         onClick={onClick}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && onClick) {
+            e.preventDefault()
+            onClick()
+          }
+        }}
       >
         {icon && <Icon name={icon} size={16} />}
         {dot && <span style={{ ...styles.dot, background: dot.startsWith("linear-gradient") ? undefined : dot, backgroundImage: dot.startsWith("linear-gradient") ? dot : undefined }} />}
@@ -1048,7 +1089,7 @@ function LibraryPage() {
             )}
           </span>
         )}
-      </button>
+      </div>
     )
   }
 
@@ -1086,7 +1127,8 @@ function LibraryPage() {
   }
 }
 
-function LibraryCell({
+// M6 Task 3:React.memo 包裹 + callback 接受 item 参数(外部传稳定 useCallback 引用,memo 才能生效)
+const LibraryCell = memo(function LibraryCell({
   item,
   selected,
   imageCount,
@@ -1098,10 +1140,10 @@ function LibraryCell({
   item: MediaItem
   selected: boolean
   imageCount?: number
-  onPreview: () => void
-  onToggleSelect: () => void
-  onDownload: () => void
-  onOpenSource: () => void
+  onPreview: (item: MediaItem) => void
+  onToggleSelect: (item: MediaItem) => void
+  onDownload: (item: MediaItem) => void
+  onOpenSource: (item: MediaItem) => void
 }) {
   const theme = useTheme()
   const styles = useMemo(() => makeStyles(theme), [theme])
@@ -1119,11 +1161,11 @@ function LibraryCell({
       style={{ ...styles.cell, ...(selected ? styles.cellSelected : {}) }}
       role="button"
       tabIndex={0}
-      onClick={onToggleSelect}
+      onClick={() => onToggleSelect(item)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
-          onToggleSelect()
+          onToggleSelect(item)
         }
       }}
       aria-label={`${selected ? "取消选择" : "选择"}素材 ${item.title || "未命名素材"}`}
@@ -1179,7 +1221,7 @@ function LibraryCell({
         style={styles.previewAction}
         onClick={(e) => {
           e.stopPropagation()
-          onPreview()
+          onPreview(item)
         }}
         aria-label="预览该素材"
         title="预览"
@@ -1192,7 +1234,7 @@ function LibraryCell({
         style={{ ...styles.check, ...(selected ? styles.checkActive : {}) }}
         onClick={(e) => {
           e.stopPropagation()
-          onToggleSelect()
+          onToggleSelect(item)
         }}
         aria-label={selected ? "取消选择该素材" : "选择该素材"}
         aria-pressed={selected}
@@ -1207,7 +1249,7 @@ function LibraryCell({
             style={styles.miniAction}
             onClick={(e) => {
               e.stopPropagation()
-              onDownload()
+              onDownload(item)
             }}
             aria-label="下载该素材"
           >
@@ -1218,7 +1260,7 @@ function LibraryCell({
               style={styles.miniAction}
               onClick={(e) => {
                 e.stopPropagation()
-                onOpenSource()
+                onOpenSource(item)
               }}
               aria-label="打开原笔记"
             >
@@ -1229,9 +1271,10 @@ function LibraryCell({
       </div>
     </div>
   )
-}
+})
 
-function LibraryRow({
+// M6 Task 3:React.memo 包裹 + callback 接受 item 参数
+const LibraryRow = memo(function LibraryRow({
   item,
   selected,
   onPreview,
@@ -1239,8 +1282,8 @@ function LibraryRow({
 }: {
   item: MediaItem
   selected: boolean
-  onPreview: () => void
-  onToggleSelect: () => void
+  onPreview: (item: MediaItem) => void
+  onToggleSelect: (item: MediaItem) => void
 }) {
   const theme = useTheme()
   const styles = useMemo(() => makeStyles(theme), [theme])
@@ -1255,11 +1298,11 @@ function LibraryRow({
       style={{ ...styles.row, ...(selected ? styles.rowSelected : {}) }}
       role="button"
       tabIndex={0}
-      onClick={onToggleSelect}
+      onClick={() => onToggleSelect(item)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
-          onToggleSelect()
+          onToggleSelect(item)
         }
       }}
       aria-label={`${selected ? "取消选择" : "选择"}素材 ${item.title || "未命名素材"}`}
@@ -1270,7 +1313,7 @@ function LibraryRow({
         style={{ ...styles.rowCheck, ...(selected ? styles.checkActive : {}) }}
         onClick={(e) => {
           e.stopPropagation()
-          onToggleSelect()
+          onToggleSelect(item)
         }}
         aria-label={selected ? "取消选择该素材" : "选择该素材"}
       >
@@ -1280,7 +1323,7 @@ function LibraryRow({
         style={styles.rowThumbButton}
         onClick={(e) => {
           e.stopPropagation()
-          onPreview()
+          onPreview(item)
         }}
         aria-label="预览该素材"
       >
@@ -1310,7 +1353,7 @@ function LibraryRow({
         style={styles.rowMeta}
         onClick={(e) => {
           e.stopPropagation()
-          onToggleSelect()
+          onToggleSelect(item)
         }}
       >
         <span style={styles.rowTitle}>{item.title || "未命名素材"}</span>
@@ -1319,7 +1362,7 @@ function LibraryRow({
       <span style={styles.rowDate}>{new Date(item.collectedAt).toLocaleDateString("zh-CN")}</span>
     </div>
   )
-}
+})
 
 function getDisplayCover(item: MediaItem): string {
   if (item.type === "image") return item.url || item.coverUrl || ""
@@ -2151,7 +2194,9 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     checkActive: {
       opacity: 1,
       background: theme.accent,
-      borderColor: theme.accent,
+      // M6 Task 3 修复:用完整 border 简写,避免与 check.border (shorthand) 冲突
+      // 原 borderColor 单写属性在 rerender 时被 React 移除,导致选中态边框颜色错乱
+      border: `2px solid ${theme.accent}`,
       color: "#fff",
     },
     cellInfo: {
@@ -2210,7 +2255,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       padding: "8px 12px",
     },
     rowSelected: {
-      borderColor: theme.accent,
+      // M6 Task 3 修复:用完整 border 简写,避免与 row.border (shorthand) 冲突
+      border: `1px solid ${theme.accent}`,
       background: "rgba(10,132,255,0.10)",
     },
     rowCheck: {
@@ -2408,7 +2454,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       cursor: "pointer",
     },
     colorButtonActive: {
-      borderColor: "#fff",
+      // M6 Task 3 修复:用完整 border 简写,避免与 colorButton.border (shorthand) 冲突
+      border: "2px solid #fff",
       boxShadow: `0 0 0 2px ${theme.accent}`,
     },
     dialogPrimary: {
