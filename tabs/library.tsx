@@ -196,20 +196,36 @@ function LibraryPage() {
     loadCollections()
   }, [loadCollections, loadItems])
 
+  // M5 Task 4:库页快捷键补齐 — Cmd/Ctrl+K 聚焦搜索,Esc 优先级 对话框 > 预览 > 搜索
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault()
         searchRef.current?.focus()
+        return
       }
-      if (e.key === "Escape" && document.activeElement === searchRef.current) {
-        setSearch("")
-        searchRef.current?.blur()
+      if (e.key === "Escape") {
+        // 对话框优先:模态未关闭前,Esc 关闭模态而非预览/搜索
+        if (dialog) {
+          e.preventDefault()
+          setDialog(null)
+          return
+        }
+        if (previewItem) {
+          e.preventDefault()
+          setPreviewItem(null)
+          return
+        }
+        if (document.activeElement === searchRef.current) {
+          e.preventDefault()
+          setSearch("")
+          searchRef.current?.blur()
+        }
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [])
+  }, [dialog, previewItem])
 
   // 切换任何筛选(范围/平台/收藏夹/类型/搜索)时清空选中:
   // selectedItems 基于全量 items,不清空则被隐藏的素材仍会随导出带出、"已选 N 项"也会失真。
@@ -217,6 +233,18 @@ function LibraryPage() {
   useEffect(() => {
     setSelectedIds((prev) => (prev.size === 0 ? prev : new Set()))
   }, [scope, platformFilter, collectionFilter, typeFilter, search])
+
+  // items 变化后清理 selectedIds 中的 stale id(其他 tab 删除 / loadItems 重拉 / 收藏夹级联清理时触发):
+  // 不清会导致 selectedCount 失真,且不会影响批量操作(selectedItems 已过滤),
+  // 但留着无意义且会干扰未来加 visibleSelectedItems 之类的严格防线。
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev
+      const validIds = new Set(items.map((item) => item.id))
+      const next = new Set([...prev].filter((id) => validIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [items])
 
   const authors = useMemo(() => {
     const map = new Map<string, { name: string; count: number; first: MediaItem }>()
@@ -327,7 +355,9 @@ function LibraryPage() {
   }, [sortedItems])
 
   const selectedItems = useMemo(() => items.filter((item) => selectedIds.has(item.id)), [items, selectedIds])
-  const selectedCount = selectedIds.size
+  // selectedCount 取 selectedItems.length 而非 selectedIds.size,避免 items 变化时短暂失真
+  // (selectedIds 已被 useEffect 清理过,但语义上"已选 N 项"必须等于"实际能批量操作的数量")
+  const selectedCount = selectedItems.length
   const allCurrentSelected = sortedItems.length > 0 && sortedItems.every((item) => selectedIds.has(item.id))
 
   const pageTitle = useMemo(() => {
@@ -361,6 +391,31 @@ function LibraryPage() {
     setPlatformFilter("")
     setCollectionFilter((current) => (current === collectionId ? "" : collectionId))
   }
+
+  // M5 Task 3:一键清空所有筛选(供无结果空状态使用)
+  const clearFilters = () => {
+    setSearch("")
+    setScope("all")
+    setCollectionFilter("")
+    setPlatformFilter("")
+    setTypeFilter("")
+  }
+
+  // M5 Task 3:无结果空状态文案根据当前筛选动态生成
+  const noMatchDesc = useMemo(() => {
+    const parts: string[] = []
+    if (search) parts.push(`关键词"${search}"`)
+    if (scope === "recent") parts.push("最近采集")
+    else if (scope === "uncategorized") parts.push("未分类")
+    if (collectionFilter) {
+      const name = collections.find((c) => c.id === collectionFilter)?.name
+      if (name) parts.push(`收藏夹「${name}」`)
+    }
+    if (platformFilter) parts.push(PLATFORM_LABELS[platformFilter])
+    if (typeFilter) parts.push(typeFilter === "image" ? "图片" : "视频")
+    if (!parts.length) return ""
+    return `当前筛选：${parts.join(" · ")}`
+  }, [search, scope, collectionFilter, platformFilter, typeFilter, collections])
 
   const toggleItem = (item: MediaItem) => {
     setSelectedIds((prev) => {
@@ -409,9 +464,9 @@ function LibraryPage() {
           setNotice({
             kind: partial ? "info" : "success",
             message: partial
-              ? `已导出 ${okCount} / ${targets.length} 项,${failed} 项失败`
+              ? `已导出 ${okCount} / ${targets.length} 项到 ${folderText},${failed} 项失败`
               : `已导出 ${okCount} 项到 ${folderText}`,
-            actionLabel: "打开文件夹",
+            actionLabel: "打开下载目录",
             onAction: () => {
               chrome.runtime.sendMessage({ type: "SHOW_DOWNLOADS_FOLDER" })
             },
@@ -421,7 +476,7 @@ function LibraryPage() {
         } else {
           setNotice({
             kind: "error",
-            message: resp?.errors?.[0] || "导出失败,请确保小红书或抖音页面可访问",
+            message: resp?.errors?.[0] || "导出失败，请确保小红书或抖音页面可访问",
           })
         }
       }
@@ -727,8 +782,36 @@ function LibraryPage() {
         </section>
 
         <section className="mc-library-scroll" style={styles.content}>
-          {sortedItems.length === 0 ? (
-            <div style={styles.emptyState}>没有匹配的素材</div>
+          {items.length === 0 ? (
+            // M5 Task 3:全局无素材 — 大型引导(库页 1024+ 宽度)
+            <div style={styles.emptyLarge}>
+              <div style={styles.emptyIllust} aria-hidden="true">
+                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="m21 15-5-5L5 21" />
+                </svg>
+              </div>
+              <div style={styles.emptyTitle}>还没有采集的素材</div>
+              <div style={styles.emptySub}>打开小红书或抖音,点开任意一篇笔记,采集后回到这里查看</div>
+            </div>
+          ) : sortedItems.length === 0 ? (
+            // M5 Task 3:有素材但筛选无结果 — 小型空状态 + 一键清空
+            <div style={styles.emptySmall}>
+              <div style={styles.emptyIllust} aria-hidden="true">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m21 21-4.3-4.3" />
+                </svg>
+              </div>
+              <div style={styles.emptyTitle}>
+                {collectionFilter ? "当前收藏夹暂无匹配素材" : "没有匹配的素材"}
+              </div>
+              {noMatchDesc && <div style={styles.emptySub}>{noMatchDesc}</div>}
+              <button className="mc-library-button" style={styles.emptyAction} onClick={clearFilters}>
+                清空筛选
+              </button>
+            </div>
           ) : viewMode === "grid" ? (
             TIME_ORDER.filter((bucket) => buckets.get(bucket)?.length).map((bucket) => (
               <div key={bucket} style={styles.timeSection}>
@@ -855,12 +938,12 @@ function LibraryPage() {
         <span style={styles.sidebarLabel}>{label}</span>
         {typeof count === "number" && <span style={styles.sidebarCount}>{count}</span>}
         {(onRename || onDelete) && (
+          // M5 Task 4:侧栏"改/删"从 span role=button 改为真实 button,降低 screen reader / 键盘风险
           <span style={styles.sidebarActions}>
             {onRename && (
-              <span
+              <button
+                type="button"
                 style={styles.sidebarMini}
-                role="button"
-                tabIndex={0}
                 aria-label={`重命名${label}`}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -868,13 +951,12 @@ function LibraryPage() {
                 }}
               >
                 改
-              </span>
+              </button>
             )}
             {onDelete && (
-              <span
+              <button
+                type="button"
                 style={styles.sidebarMini}
-                role="button"
-                tabIndex={0}
                 aria-label={`删除${label}`}
                 onClick={(e) => {
                   e.stopPropagation()
@@ -882,7 +964,7 @@ function LibraryPage() {
                 }}
               >
                 删
-              </span>
+              </button>
             )}
           </span>
         )}
@@ -1088,8 +1170,23 @@ function LibraryRow({
   const showCoverImage = cover && !imgError
   const showVideoFrame = isVideo && !cover && !imgError
   return (
-    <div style={{ ...styles.row, ...(selected ? styles.rowSelected : {}) }} onClick={onToggleSelect}>
+    // M5 Task 4:列表行补 role=button + tabIndex + Enter/Space,与 LibraryCell 一致
+    <div
+      style={{ ...styles.row, ...(selected ? styles.rowSelected : {}) }}
+      role="button"
+      tabIndex={0}
+      onClick={onToggleSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault()
+          onToggleSelect()
+        }
+      }}
+      aria-label={`${selected ? "取消选择" : "选择"}素材 ${item.title || "未命名素材"}`}
+      aria-pressed={selected}
+    >
       <button
+        type="button"
         style={{ ...styles.rowCheck, ...(selected ? styles.checkActive : {}) }}
         onClick={(e) => {
           e.stopPropagation()
@@ -1178,6 +1275,28 @@ function CollectionDialog({
   ]
   const [name, setName] = useState(dialog.type === "rename" ? dialog.collection.name : "")
   const [color, setColor] = useState(dialog.type === "rename" ? dialog.collection.color : colorOptions[0])
+  // M5 Task 4:对话框打开时,Enter/Esc 快捷键 — capture 阶段拦截,避免与库页 keyboard handler 重复触发
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation()
+        e.preventDefault()
+        onClose()
+        return
+      }
+      if (e.key === "Enter" && (dialog.type === "create" || dialog.type === "rename")) {
+        // 避免在 textarea / 颜色按钮激活时误触,只响应普通 input
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === "INPUT") {
+          e.preventDefault()
+          if (dialog.type === "create") onCreate(name, color)
+          else onRename(dialog.collection, name)
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey, { capture: true })
+    return () => window.removeEventListener("keydown", onKey, { capture: true })
+  }, [dialog, name, color, onClose, onCreate, onRename])
 
   const title =
     dialog.type === "create"
@@ -1371,10 +1490,11 @@ function LibraryWithTheme() {
 export default LibraryWithTheme
 
 const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => {
-  const card = "rgba(255,255,255,0.05)"
-  const cardHover = "rgba(255,255,255,0.09)"
-  const textTertiary = "rgba(255,255,255,0.42)"
-  const green = "#30d158"
+  // M5 Task 5:用 theme.* 替代硬编码 rgba,light 主题下不会失效
+  const card = theme.card
+  const cardHover = theme.cardHover
+  const textTertiary = theme.textTertiary
+  const green = "#30d158" // success 状态色,design-tokens 暂无对应,保留字面量
 
   return {
     shell: {
@@ -1478,7 +1598,7 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       marginLeft: "auto",
       fontSize: 11,
       color: textTertiary,
-      fontWeight: 500,
+      fontWeight: 600, // M5 Task 5:数字标签用 600(更醒目)
     },
     sidebarActions: {
       display: "inline-flex",
@@ -1554,6 +1674,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       display: "flex",
       alignItems: "center",
       gap: 14,
+      // M5 Task 6:窄宽允许换行,避免标题/搜索框被挤
+      flexWrap: "wrap",
       borderBottom: `1px solid ${theme.hairline}`,
       flexShrink: 0,
     },
@@ -1567,6 +1689,7 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     },
     searchWrap: {
       flex: 1,
+      minWidth: 220, // M5 Task 6:防止窄宽时搜索框被压成 0
       maxWidth: 420,
       position: "relative",
     },
@@ -1597,7 +1720,7 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       borderRadius: theme.r.sm,
       padding: "9px 13px",
       fontSize: 13,
-      fontWeight: 500,
+      fontWeight: 600, // M5 Task 5:工具按钮用 600
       cursor: "pointer",
       display: "flex",
       alignItems: "center",
@@ -1627,7 +1750,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     },
     dashboard: {
       display: "grid",
-      gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+      // M5 Task 6:auto-fit 自适应列数 — 1024+ 4 列,700-1024 2-3 列,<700 单列
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
       gap: 12,
       padding: "18px 28px 4px",
       flexShrink: 0,
@@ -1676,6 +1800,8 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       display: "flex",
       alignItems: "center",
       gap: 10,
+      // M5 Task 6:窄宽让筛选 chip 与批量操作换行,避免重叠
+      flexWrap: "wrap",
       flexShrink: 0,
     },
     chip: {
@@ -2043,13 +2169,64 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       color: textTertiary,
       textAlign: "right",
     },
-    emptyState: {
+    // M5 Task 3:空状态视觉分两档(大:全库无素材 / 小:筛选无结果)
+    emptyLarge: {
       height: "100%",
-      minHeight: 260,
-      display: "grid",
-      placeItems: "center",
+      minHeight: 360,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      textAlign: "center",
+      padding: 24,
+    },
+    emptySmall: {
+      height: "100%",
+      minHeight: 240,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      textAlign: "center",
+      padding: 24,
+      gap: 6,
+    },
+    emptyIllust: {
+      width: 72,
+      height: 72,
+      borderRadius: theme.r.md,
+      background: theme.card,
+      border: `0.5px solid ${theme.hairline}`,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      color: theme.textSecondary,
+      marginBottom: theme.sp.md,
+    },
+    emptyTitle: {
+      fontSize: 17,
+      fontWeight: 600,
+      letterSpacing: -0.2,
+      color: theme.textPrimary,
+      marginBottom: 4,
+    },
+    emptySub: {
+      fontSize: 13,
       color: textTertiary,
-      fontSize: 14,
+      lineHeight: 1.5,
+      maxWidth: 420,
+    },
+    emptyAction: {
+      marginTop: theme.sp.md,
+      height: 34,
+      padding: "0 16px",
+      border: "none",
+      borderRadius: theme.r.sm,
+      background: theme.accent,
+      color: "#fff",
+      fontWeight: 600,
+      fontSize: 13,
+      cursor: "pointer",
     },
     dialogOverlay: {
       position: "fixed",

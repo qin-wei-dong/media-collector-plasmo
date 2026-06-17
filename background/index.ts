@@ -242,6 +242,8 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
         chrome.downloads.showDefaultFolder()
         sendResponse({ success: true })
       } catch (e) {
+        // API 拒绝(权限不足 / 浏览器策略):用系统通知兜底,避免静默失败
+        showNote("无法打开下载目录", "请在 Chrome 下载记录中查看")
         sendResponse({ success: false, error: String(e) })
       }
       return true

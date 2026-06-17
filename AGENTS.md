@@ -121,6 +121,77 @@ Token 分组（`lib/design-tokens.ts`）：
 | `localStorage.__mc_state__` | `lib/xhs-state-inject.ts` | synced `__INITIAL_STATE__`（详情页 SSR，cross-world） |
 | `localStorage.__mc_notes__` | `lib/xhs-state-inject.ts` | fetch/XHR 拦截缓存的笔记媒体（首页浮层 CSR，LRU 上限 200） |
 
+## M5 稳定性与体验打磨(2026-06)
+
+M5 不新增功能,只把现有能力打磨到"长期可用"状态。详见 `docs/superpowers/plans/2026-06-17-m5-stability-polish-implementation.md`。
+
+### 库页批量选择安全(`tabs/library.tsx`)
+
+- 切换任意筛选(`scope` / `platformFilter` / `collectionFilter` / `typeFilter` / `search`)时,`useEffect` 清空 `selectedIds`(已空时返回同引用,React bail out,避免 search 击键 re-render)
+- `items` 变化后(其他 tab 删除 / 收藏夹级联清理),`useEffect` 清理 `selectedIds` 中 stale id
+- `selectedCount = selectedItems.length`(不是 `selectedIds.size`),避免 items 变化时短暂失真
+- 批量操作(导出 / 删除 / 加入收藏夹)成功后立即 `clearSelection()`
+
+### 库页空状态分支
+
+- `items.length === 0`:大空状态(图标 + 标题 + 引导语),引导用户去 XHS/抖音采集
+- `items.length > 0 && sortedItems.length === 0`:小空状态(动态描述当前筛选条件 + 一键清空按钮)
+- 收藏夹视图无匹配时,标题为「当前收藏夹暂无匹配素材」,与其他筛选区分
+
+### 导出反馈 Toast(`tabs/library.tsx` + `background/index.ts`)
+
+- 成功文案:`已导出 N 项到 素材库/<folder>/`(单目录) / `已导出 N 项到 素材库/多个文件夹/`(多目录)
+- 部分成功文案:`已导出 X / N 项到 素材库/<folder>/，Y 项失败`(中文逗号 + 目标目录信息)
+- Toast action label:**"打开下载目录"**(不是"打开文件夹"——`chrome.downloads.showDefaultFolder()` 只承诺打开默认下载目录,不能定位到 `media-collector/<folder>/` 子目录)
+- `SHOW_DOWNLOADS_FOLDER` 失败时:background 调 `showNote("无法打开下载目录", "请在 Chrome 下载记录中查看")` 系统通知兜底
+- 下载失败统一文案:`导出失败，请确保小红书或抖音页面可访问`(中文逗号)
+
+### 库页键盘与 a11y
+
+- `Cmd/Ctrl+K` 聚焦搜索 / `/` 打开搜索(已有)
+- `Esc` 优先级:**对话框 > 预览 > 搜索**;对话框用 capture phase 监听,避免与库页 keyboard handler 重复触发
+- `CollectionDialog` 内 `Enter` 提交(仅 create/rename,过滤 INPUT 标签避免误触)/ `Esc` 关闭
+- 侧栏收藏夹「改/删」从 `span role="button"` 改为真实 `<button>`
+- `LibraryRow` 补 `role="button"` + `tabIndex={0}` + Enter/Space 激活
+- 全局 `:focus-visible` Apple Action Blue 描边由 `injectLibraryStyles()` 注入
+- 自动化 `pnpm audit:a11y` 当前仅覆盖 popup(2026-06 范围);library harness 扩展未做,见 M5 风险 2
+
+### 视觉一致性(`popup.tsx` + `tabs/library.tsx`)
+
+- 按钮/标签/数字标签用 `fontWeight: 600`(次要信息 500 / 强调 600 / 大数字 700)
+- 库页 `const card / cardHover / textTertiary` 从硬编码 rgba 改为 `theme.*`(避免 light 主题失效)
+- 普通按钮/卡片不依赖阴影建层级;Toast / modal / FloatBar 保留 `theme.shadowFloat`
+- 选中态:网格卡片 outline `theme.accent` 3px;列表行 `borderColor: theme.accent` + 浅蓝背景
+- 圆角统一:`r.sm` 工具按钮 / `r.md` 网格卡片 / `r.lg` 大浮层 / `r.pill` chip
+
+### 响应式与布局(`tabs/library.tsx` + `popup.tsx`)
+
+- toolbar `flexWrap: "wrap"` + searchWrap `minWidth: 220` + `maxWidth: 420` — 窄宽搜索框不挤压
+- subbar `flexWrap: "wrap"` — 窄宽筛选 chip 与批量操作换行不重叠
+- dashboard `gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))"` — 1024+ 4 列,700-1024 2-3 列,<700 单列
+- 网格列宽 `repeat(auto-fill, minmax(150px, 1fr))`(已存在)
+
+### 性能架构
+
+- 库页主组件 12 个 `useMemo` 拆分,依赖完整,无级联重算
+- 聚合操作:authors / stats / sidebarCounts / collectionCounts / noteImageCounts / filteredItems / sortedItems / buckets / selectedItems / pageTitle / previewSiblings / noMatchDesc 全部独立缓存
+- N=1000 以下无明显卡顿;暂不引入虚拟滚动(M5 不做,见 plan 风险 3)
+- 实际 100+ 素材体验由用户 Chrome 验证
+
+### M5 验收命令
+
+```bash
+pnpm build            # Plasmo build,预期成功
+pnpm audit:a11y       # axe-core 审计(仅 popup 覆盖)
+```
+
+### 风险与后续(M6 候选)
+
+- a11y audit 脚本扩展 library harness(plan 风险 2,降级)
+- 100+ 素材压测缺 Chrome 自动化(plan 风险 3,降级 — 代码架构合理,实际体验由用户验)
+- 虚拟滚动(M6)
+- 导出历史与失败重试(M6)
+
 ## File routing reminder
 
 Anything in `contents/*.ts` becomes a content script. Helpers shared between content scripts must live in `lib/` (not `contents/`) — otherwise they'd inject on every URL.
