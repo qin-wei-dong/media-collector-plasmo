@@ -1,6 +1,6 @@
 // background/index.ts — 消息路由 + 安装初始化
 import { type MediaItem, type MessageType, type MessagePayloads, STORAGE_KEY } from "../types"
-import { getItems, saveItem, saveItems, clearItems, removeItems, restoreItems } from "./storage"
+import { getItems, saveItem, saveItems, clearItems, removeItems, restoreItems, getExportHistory, clearExportHistory } from "./storage"
 import {
   assignCollection,
   createCollection,
@@ -277,6 +277,27 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
         .then((result) => sendResponse(result))
         .catch((e) => sendResponse({ success: false, errors: [String(e)] }))
       return true
+
+    case "GET_EXPORT_HISTORY":
+      getExportHistory()
+        .then((history) => sendResponse({ success: true, history }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+
+    case "CLEAR_EXPORT_HISTORY":
+      clearExportHistory()
+        .then(() => sendResponse({ success: true }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+
+    case "RETRY_EXPORT_FAILED": {
+      // M6 Task 4:重试 failedFiles — 复用 batchDownload 路径,继续写历史(appendExportHistory)
+      const payload = message.payload as MessagePayloads["RETRY_EXPORT_FAILED"]
+      batchDownload(payload.files)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, errors: [String(e)] }))
+      return true
+    }
 
     case "SHOW_DOWNLOADS_FOLDER": {
       // 打开 Chrome 默认下载目录(用户需再点进 media-collector/<folder>)

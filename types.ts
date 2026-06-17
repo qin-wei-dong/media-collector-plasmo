@@ -59,6 +59,9 @@ export type MessageType =
   | "REORDER_COLLECTIONS"
   | "PIN_COLLECTION"
   | "MOVE_COLLECTION_ITEMS"
+  | "GET_EXPORT_HISTORY"
+  | "CLEAR_EXPORT_HISTORY"
+  | "RETRY_EXPORT_FAILED"
   | "SHOW_DOWNLOADS_FOLDER"
 
 export interface MessagePayloads {
@@ -104,6 +107,10 @@ export interface MessagePayloads {
   REORDER_COLLECTIONS: { orderedIds: string[] }
   PIN_COLLECTION: { id: string; pinned: boolean }
   MOVE_COLLECTION_ITEMS: { itemIds: string[]; fromCollectionId: string; toCollectionId: string }
+  GET_EXPORT_HISTORY: void
+  CLEAR_EXPORT_HISTORY: void
+  // 重试导出失败文件:files 是历史记录中的 failedFiles
+  RETRY_EXPORT_FAILED: { files: Array<{ id?: string; url: string; filename: string; platform?: Platform }> }
   SHOW_DOWNLOADS_FOLDER: void
 }
 
@@ -120,6 +127,8 @@ export interface MessageResponse {
   exportedIds?: string[]
   collections?: Collection[]
   collection?: Collection
+  // M6 Task 4:导出历史(GET_EXPORT_HISTORY 返回)
+  history?: ExportHistoryEntry[]
   media?: {
     url: string
     type: MediaType
@@ -129,8 +138,28 @@ export interface MessageResponse {
   } | null
 }
 
+// M6 Task 4:导出历史条目 — 记录每次 batchDownload 的结果
+export interface ExportHistoryEntry {
+  id: string
+  createdAt: string
+  total: number
+  successCount: number
+  failedCount: number
+  folders: string[]
+  itemIds: string[]
+  failedFiles?: Array<{
+    id?: string
+    url: string
+    filename: string
+    platform?: Platform
+    error: string
+  }>
+}
+
 export const STORAGE_KEY = "collected_media"
 export const COLLECTIONS_KEY = "collections"
+export const EXPORT_HISTORY_KEY = "export_history"
+export const EXPORT_HISTORY_MAX = 50
 export const MEDIA_COLLECTOR_DIR = "media-collector"
 
 export const PLATFORM_LABELS: Record<Platform, string> = {

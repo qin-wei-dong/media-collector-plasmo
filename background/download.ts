@@ -1,8 +1,8 @@
 // background/download.ts — 下载操作
 
-import { MEDIA_COLLECTOR_DIR, type Platform } from "../types"
+import { type ExportHistoryEntry, MEDIA_COLLECTOR_DIR, type Platform } from "../types"
 import { showNote } from "./index"
-import { markItemsExported } from "./storage"
+import { appendExportHistory, markItemsExported } from "./storage"
 
 /** 单个下载文件描述。filename 是相对路径,可含子目录,如 `618选题/标题_01.jpg`。 */
 export type DownloadFile = {
@@ -112,16 +112,26 @@ async function downloadOne(file: DownloadFile, index: number): Promise<void> {
 
 async function fetchAndDownload(
   files: DownloadFile[]
-): Promise<{ ok: number; errors: string[]; exportedIds: string[]; folders: string[] }> {
+): Promise<{
+  ok: number
+  errors: string[]
+  exportedIds: string[]
+  folders: string[]
+  // M6 Task 4:失败文件详情,供历史记录 + 重试
+  failedFiles: Array<{ id?: string; url: string; filename: string; platform?: Platform; error: string }>
+}> {
   let ok = 0
   const errors: string[] = []
   const successfulIds: string[] = []
   const folders: string[] = []
+  const failedFiles: Array<{ id?: string; url: string; filename: string; platform?: Platform; error: string }> = []
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
     if (isUnsafePath(file.filename)) {
-      errors.push(`${file.filename}: 非法路径`)
+      const msg = `${file.filename}: 非法路径`
+      errors.push(msg)
+      failedFiles.push({ ...file, error: msg })
       continue
     }
     try {
@@ -133,11 +143,13 @@ async function fetchAndDownload(
       // 间隔 800ms,降低 CDN 限流概率(批量下载核心修复)
       await new Promise((r) => setTimeout(r, 800))
     } catch (e: any) {
-      errors.push(`${file.filename || file.url.slice(-20)}: ${e.message}`)
+      const msg = `${file.filename || file.url.slice(-20)}: ${e.message}`
+      errors.push(msg)
+      failedFiles.push({ ...file, error: e?.message || String(e) })
     }
   }
 
-  // 成功项写入 exportedAt(失败不影响下载结果)
+  // 成功项写入 exportedAt(失败不影响下载流程)
   if (successfulIds.length) {
     try {
       await markItemsExported(successfulIds, new Date().toISOString())
@@ -146,7 +158,7 @@ async function fetchAndDownload(
     }
   }
 
-  return { ok, errors, exportedIds: successfulIds, folders }
+  return { ok, errors, exportedIds: successfulIds, folders, failedFiles }
 }
 
 export async function batchDownload(
@@ -158,11 +170,29 @@ export async function batchDownload(
   folder?: string
   folders?: string[]
   exportedIds?: string[]
+  history?: ExportHistoryEntry
 }> {
   if (!files?.length) return { success: false }
 
   const result = await fetchAndDownload(files)
   const folder = result.folders.length === 1 ? result.folders[0] : undefined
+
+  // M6 Task 4:写导出历史(任一 batchDownload 完成后,成功/部分失败/全失败 都记录)
+  const historyEntry: ExportHistoryEntry = {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+    createdAt: new Date().toISOString(),
+    total: files.length,
+    successCount: result.ok,
+    failedCount: result.failedFiles.length,
+    folders: result.folders,
+    itemIds: result.exportedIds,
+    failedFiles: result.failedFiles.length ? result.failedFiles : undefined,
+  }
+  try {
+    await appendExportHistory(historyEntry)
+  } catch {
+    // 历史写入失败不阻断下载流程
+  }
 
   if (result.errors.length === 0) {
     showNote("✅ 批量下载完成", `共 ${result.ok} 个文件已保存到 ${MEDIA_COLLECTOR_DIR} 文件夹`)
@@ -172,6 +202,7 @@ export async function batchDownload(
       folder,
       folders: result.folders,
       exportedIds: result.exportedIds,
+      history: historyEntry,
     }
   } else if (result.ok > 0) {
     showNote("⚠️ 部分下载失败", `成功 ${result.ok} / ${files.length}`)
@@ -182,9 +213,10 @@ export async function batchDownload(
       folder,
       folders: result.folders,
       exportedIds: result.exportedIds,
+      history: historyEntry,
     }
   } else {
     showNote("❌ 下载失败", result.errors[0] || "请稍后重试")
-    return { success: false, errors: result.errors }
+    return { success: false, errors: result.errors, history: historyEntry }
   }
 }
