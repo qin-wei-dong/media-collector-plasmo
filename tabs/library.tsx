@@ -291,6 +291,19 @@ function LibraryPage() {
     }))
   }, [items])
 
+  // M6 Task 5:侧栏收藏夹排序 — pinned 在前 / sortOrder 小的在前 / sortOrder 相同时 createdAt 倒序
+  const sortedCollections = useMemo(() => {
+    return [...collections].sort((a, b) => {
+      const aPinned = a.pinned ?? false
+      const bPinned = b.pinned ?? false
+      if (aPinned !== bPinned) return aPinned ? -1 : 1
+      const aOrder = a.sortOrder ?? 0
+      const bOrder = b.sortOrder ?? 0
+      if (aOrder !== bOrder) return aOrder - bOrder
+      return +new Date(b.createdAt) - +new Date(a.createdAt)
+    })
+  }, [collections])
+
   const authors = useMemo(() => {
     const map = new Map<string, { name: string; count: number; first: MediaItem }>()
     // M6 Task 3:用 enrichedItems._collectedAtMs 替代 +new Date
@@ -598,16 +611,58 @@ function LibraryPage() {
     })
   }
 
-  const renameCollection = (collection: Collection, name: string) => {
-    chrome.runtime.sendMessage({ type: "RENAME_COLLECTION", payload: { id: collection.id, name } }, (resp) => {
-      if (resp?.success) {
-        setNotice({ kind: "success", message: "已重命名收藏夹" })
-        setDialog(null)
-        loadCollections()
-      } else {
-        setNotice({ kind: "error", message: resp?.error || "重命名失败" })
+  // M6 Task 5:编辑收藏夹(name + color + pinned 一起保存,3 个 message 串行写)
+  const updateCollection = (collection: Collection, next: { name: string; color: string; pinned: boolean }) => {
+    const tasks: Array<() => Promise<boolean>> = []
+    if (next.name !== collection.name) {
+      tasks.push(
+        () =>
+          new Promise<boolean>((resolve) => {
+            chrome.runtime.sendMessage(
+              { type: "RENAME_COLLECTION", payload: { id: collection.id, name: next.name } },
+              (resp: { success?: boolean } | undefined) => resolve(resp?.success === true)
+            )
+          })
+      )
+    }
+    if (next.color !== collection.color) {
+      tasks.push(
+        () =>
+          new Promise<boolean>((resolve) => {
+            chrome.runtime.sendMessage(
+              { type: "UPDATE_COLLECTION_COLOR", payload: { id: collection.id, color: next.color } },
+              (resp: { success?: boolean } | undefined) => resolve(resp?.success === true)
+            )
+          })
+      )
+    }
+    if (next.pinned !== (collection.pinned ?? false)) {
+      tasks.push(
+        () =>
+          new Promise<boolean>((resolve) => {
+            chrome.runtime.sendMessage(
+              { type: "PIN_COLLECTION", payload: { id: collection.id, pinned: next.pinned } },
+              (resp: { success?: boolean } | undefined) => resolve(resp?.success === true)
+            )
+          })
+      )
+    }
+    if (!tasks.length) {
+      setDialog(null)
+      return
+    }
+    ;(async () => {
+      for (const task of tasks) {
+        const ok = await task()
+        if (!ok) {
+          setNotice({ kind: "error", message: "更新失败" })
+          return
+        }
       }
-    })
+      setNotice({ kind: "success", message: "已更新收藏夹" })
+      setDialog(null)
+      loadCollections()
+    })()
   }
 
   const deleteCollection = (collection: Collection) => {
@@ -626,10 +681,36 @@ function LibraryPage() {
 
   const assignSelectedToCollection = (collection: Collection) => {
     if (!selectedCount) return
+    const itemIds = selectedItems.map((item) => item.id)
+    // M6 Task 5:当前在某个收藏夹视图中 → 走 MOVE(从源移除并加入目标)
+    // 不在收藏夹视图 → 走 ASSIGN(加入新归属,保留多归属)
+    if (collectionFilter) {
+      chrome.runtime.sendMessage(
+        {
+          type: "MOVE_COLLECTION_ITEMS",
+          payload: {
+            itemIds,
+            fromCollectionId: collectionFilter,
+            toCollectionId: collection.id,
+          },
+        },
+        (resp) => {
+          if (resp?.success) {
+            setNotice({ kind: "success", message: `已移动 ${resp.movedCount ?? itemIds.length} 项到「${collection.name}」` })
+            setDialog(null)
+            clearSelection()
+            loadItems()
+          } else {
+            setNotice({ kind: "error", message: resp?.error || "移动失败" })
+          }
+        }
+      )
+      return
+    }
     chrome.runtime.sendMessage(
       {
         type: "ASSIGN_COLLECTION",
-        payload: { itemIds: selectedItems.map((item) => item.id), collectionId: collection.id },
+        payload: { itemIds, collectionId: collection.id },
       },
       (resp) => {
         if (resp?.success) {
@@ -708,10 +789,10 @@ function LibraryPage() {
           actionLabel="+ 新建"
           onAction={() => setDialog({ type: "create" })}
         >
-          {collections.length === 0 && (
+          {sortedCollections.length === 0 && (
             <div style={styles.sidebarEmpty}>还没有收藏夹</div>
           )}
-          {collections.map((collection) => (
+          {sortedCollections.map((collection) => (
             <SidebarItem
               key={collection.id}
               dot={collection.color}
@@ -843,7 +924,12 @@ function LibraryPage() {
               disabled={!selectedCount}
             >
               <Icon name="box" size={15} />
-              {collections.length ? "加入收藏夹" : "新建收藏夹"}
+              {/* M6 Task 5:在收藏夹视图中显示"移动到..." — 暗示从源移除 */}
+              {collectionFilter
+                ? "移动到..."
+                : collections.length
+                  ? "加入收藏夹"
+                  : "新建收藏夹"}
             </button>
             {collectionFilter && (
               <button className="mc-library-button" style={styles.bulkGhost} onClick={unassignSelectedFromCollection} disabled={!selectedCount}>
@@ -981,7 +1067,7 @@ function LibraryPage() {
           collections={collections}
           onClose={() => setDialog(null)}
           onCreate={createCollection}
-          onRename={renameCollection}
+          onUpdate={updateCollection}
           onDelete={deleteCollection}
           onAssign={assignSelectedToCollection}
         />
@@ -1374,7 +1460,7 @@ function CollectionDialog({
   collections,
   onClose,
   onCreate,
-  onRename,
+  onUpdate,
   onDelete,
   onAssign,
 }: {
@@ -1382,7 +1468,8 @@ function CollectionDialog({
   collections: Collection[]
   onClose: () => void
   onCreate: (name: string, color: string) => void
-  onRename: (collection: Collection, name: string) => void
+  // M6 Task 5:rename dialog 改"编辑收藏夹",一次保存 name + color + pinned
+  onUpdate: (collection: Collection, next: { name: string; color: string; pinned: boolean }) => void
   onDelete: (collection: Collection) => void
   onAssign: (collection: Collection) => void
 }) {
@@ -1413,22 +1500,27 @@ function CollectionDialog({
         if (tag === "INPUT") {
           e.preventDefault()
           if (dialog.type === "create") onCreate(name, color)
-          else onRename(dialog.collection, name)
+          else onUpdate(dialog.collection, { name, color, pinned })
         }
       }
     }
     window.addEventListener("keydown", onKey, { capture: true })
     return () => window.removeEventListener("keydown", onKey, { capture: true })
-  }, [dialog, name, color, onClose, onCreate, onRename])
+  }, [dialog, name, color, pinned, onClose, onCreate, onUpdate])
 
   const title =
     dialog.type === "create"
       ? "新建收藏夹"
       : dialog.type === "rename"
-        ? "重命名收藏夹"
+        ? "编辑收藏夹"
         : dialog.type === "delete"
           ? "删除收藏夹"
           : "加入收藏夹"
+
+  // M6 Task 5:置顶状态(仅 rename 模式有意义)
+  const [pinned, setPinned] = useState(
+    dialog.type === "rename" ? dialog.collection.pinned ?? false : false
+  )
 
   return (
     <div style={styles.dialogOverlay} onClick={onClose}>
@@ -1463,12 +1555,24 @@ function CollectionDialog({
                 />
               ))}
             </div>
+            {/* M6 Task 5:置顶 toggle — 仅 rename 模式(创建时新 collection 排序按 max+1 自动放最后,无需置顶) */}
+            {dialog.type === "rename" && (
+              <label style={styles.pinRow}>
+                <input
+                  type="checkbox"
+                  checked={pinned}
+                  onChange={(e) => setPinned(e.target.checked)}
+                  aria-label="置顶该收藏夹"
+                />
+                <span>置顶到侧栏最前</span>
+              </label>
+            )}
             <button
               className="mc-library-button"
               style={styles.dialogPrimary}
               onClick={() => {
                 if (dialog.type === "create") onCreate(name, color)
-                else onRename(dialog.collection, name)
+                else onUpdate(dialog.collection, { name, color, pinned })
               }}
             >
               {dialog.type === "create" ? "创建" : "保存"}
@@ -2466,6 +2570,15 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       background: theme.accent,
       color: "#fff",
       fontWeight: 600,
+      cursor: "pointer",
+    },
+    // M6 Task 5:置顶 toggle 行
+    pinRow: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      fontSize: 13,
+      color: textSecondary,
       cursor: "pointer",
     },
     collectionList: {
