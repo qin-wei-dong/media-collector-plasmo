@@ -53,6 +53,63 @@ function isUnsafePath(filename: string): boolean {
  * - filename 可含子目录,最终路径为 `MEDIA_COLLECTOR_DIR/<filename>`
  * - 成功项记录 id 与 folder,下载完成后批量写入 exportedAt
  */
+/**
+ * 下载单个文件:fetch → blob → dataUrl → chrome.downloads。
+ * 支持失败重试(限流场景):首次失败后延迟 1.5s 重试 1 次。
+ */
+async function downloadOne(file: DownloadFile, index: number): Promise<void> {
+  const doFetch = async (): Promise<Blob> => {
+    const resp = await fetch(file.url, {
+      headers: { Referer: refererFor(file.platform) },
+    })
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    return resp.blob()
+  }
+
+  // 首次尝试;失败则延迟重试 1 次(应对 CDN 限流 429/403)
+  let blob: Blob
+  try {
+    blob = await doFetch()
+  } catch (firstErr) {
+    await new Promise((r) => setTimeout(r, 1500))
+    blob = await doFetch() // 重试失败会抛出,由外层 catch 捕获
+  }
+
+  const dataUrl = await blobToDataUrl(blob)
+
+  await new Promise<void>((resolve, reject) => {
+    chrome.downloads.download(
+      {
+        url: dataUrl,
+        filename: MEDIA_COLLECTOR_DIR + "/" + (file.filename || `素材_${index + 1}.jpg`),
+        saveAs: false,
+      },
+      (downloadId) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message))
+          return
+        }
+        const onChanged = (delta: chrome.downloads.DownloadDelta) => {
+          if (delta.id === downloadId && delta.state?.current === "complete") {
+            chrome.downloads.onChanged.removeListener(onChanged)
+            resolve()
+          }
+          if (delta.id === downloadId && delta.state?.current === "interrupted") {
+            chrome.downloads.onChanged.removeListener(onChanged)
+            reject(new Error("下载中断"))
+          }
+        }
+        chrome.downloads.onChanged.addListener(onChanged)
+        // 兜底:15s 后无论状态都 resolve(避免 onChanged 不触发卡住队列)
+        setTimeout(() => {
+          chrome.downloads.onChanged.removeListener(onChanged)
+          resolve()
+        }, 15000)
+      }
+    )
+  })
+}
+
 async function fetchAndDownload(
   files: DownloadFile[]
 ): Promise<{ ok: number; errors: string[]; exportedIds: string[]; folders: string[] }> {
@@ -63,58 +120,18 @@ async function fetchAndDownload(
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
-    // 后台路径穿越防御:拒绝绝对路径和 `.` / `..` 段(不误伤含 ".." 的合法文件名)
     if (isUnsafePath(file.filename)) {
       errors.push(`${file.filename}: 非法路径`)
       continue
     }
     try {
-      // 先在 service worker 里 fetch(带各自平台 Referer 绕防盗链)
-      const resp = await fetch(file.url, {
-        headers: { Referer: refererFor(file.platform) },
-      })
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-      const blob = await resp.blob()
-      // service worker 没有 URL.createObjectURL,转 data URL(base64)给 chrome.downloads
-      const dataUrl = await blobToDataUrl(blob)
-
-      // 用 chrome.downloads 下载(service worker 有此 API)
-      await new Promise<void>((resolve, reject) => {
-        chrome.downloads.download(
-          {
-            url: dataUrl,
-            filename: MEDIA_COLLECTOR_DIR + "/" + (file.filename || `素材_${i + 1}.jpg`),
-            saveAs: false,
-          },
-          (downloadId) => {
-            if (chrome.runtime.lastError) {
-              reject(new Error(chrome.runtime.lastError.message))
-            } else {
-              const onChanged = (delta: chrome.downloads.DownloadDelta) => {
-                if (delta.id === downloadId && delta.state?.current === "complete") {
-                  chrome.downloads.onChanged.removeListener(onChanged)
-                  resolve()
-                }
-                if (delta.id === downloadId && delta.state?.current === "interrupted") {
-                  chrome.downloads.onChanged.removeListener(onChanged)
-                  reject(new Error("下载中断"))
-                }
-              }
-              chrome.downloads.onChanged.addListener(onChanged)
-              setTimeout(() => {
-                chrome.downloads.onChanged.removeListener(onChanged)
-                resolve()
-              }, 15000)
-            }
-          }
-        )
-      })
+      await downloadOne(file, i)
       ok++
       if (file.id) successfulIds.push(file.id)
       const folder = extractFolder(file.filename)
       if (folder && !folders.includes(folder)) folders.push(folder)
-      // 间隔避免节流
-      await new Promise((r) => setTimeout(r, 300))
+      // 间隔 800ms,降低 CDN 限流概率(批量下载核心修复)
+      await new Promise((r) => setTimeout(r, 800))
     } catch (e: any) {
       errors.push(`${file.filename || file.url.slice(-20)}: ${e.message}`)
     }

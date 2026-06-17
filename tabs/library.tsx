@@ -484,7 +484,7 @@ function LibraryPage() {
           setNotice({
             kind: partial ? "info" : "success",
             message: partial
-              ? `已导出 ${okCount} / ${targets.length} 项到 ${folderText},${failed} 项失败`
+              ? `已导出 ${okCount} / ${targets.length} 项到 ${folderText}，${failed} 项失败（${(resp.errors || []).slice(0, 2).join("；")}）`
               : `已导出 ${okCount} 项到 ${folderText}`,
             actionLabel: "打开下载目录",
             onAction: () => {
