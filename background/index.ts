@@ -1,6 +1,15 @@
 // background/index.ts — 消息路由 + 安装初始化
 import { type MediaItem, type MessageType, type MessagePayloads, STORAGE_KEY } from "../types"
 import { getItems, saveItem, saveItems, clearItems, removeItems, restoreItems } from "./storage"
+import {
+  assignCollection,
+  createCollection,
+  deleteCollection,
+  ensureCollectionsInitialized,
+  listCollections,
+  renameCollection,
+  unassignCollection,
+} from "./collections"
 import { batchDownload } from "./download"
 import { stateInjector } from "../lib/xhs-state-inject"
 
@@ -49,6 +58,9 @@ chrome.runtime.onInstalled.addListener(() => {
     if (!result[STORAGE_KEY]) {
       chrome.storage.local.set({ [STORAGE_KEY]: [] })
     }
+  })
+  ensureCollectionsInitialized().catch((err) => {
+    console.error("[BG] 初始化收藏夹失败", err)
   })
 
   chrome.contextMenus.create({
@@ -116,7 +128,7 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
         width: img.width,
         height: img.height,
         author: author || undefined,
-        coverUrl: img.coverUrl || img.url, // 首图作为封面,缺省回退自身 url
+        coverUrl: img.coverUrl || img.url,
       }))
       saveItems(newItems).then((result) => {
         if (result.success) {
@@ -131,6 +143,12 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
 
     case "GET_ITEMS":
       getItems().then((items) => sendResponse({ success: true, items }))
+      return true
+
+    case "GET_COLLECTIONS":
+      listCollections()
+        .then((collections) => sendResponse({ success: true, collections }))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
       return true
 
     case "INJECT_MAIN_WORLD": {
@@ -174,6 +192,46 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
       return true
     }
 
+    case "CREATE_COLLECTION": {
+      const payload = message.payload as MessagePayloads["CREATE_COLLECTION"]
+      createCollection(payload.name, payload.color)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "RENAME_COLLECTION": {
+      const payload = message.payload as MessagePayloads["RENAME_COLLECTION"]
+      renameCollection(payload.id, payload.name)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "DELETE_COLLECTION": {
+      const payload = message.payload as MessagePayloads["DELETE_COLLECTION"]
+      deleteCollection(payload.id)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "ASSIGN_COLLECTION": {
+      const payload = message.payload as MessagePayloads["ASSIGN_COLLECTION"]
+      assignCollection(payload.itemIds, payload.collectionId)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
+    case "UNASSIGN_COLLECTION": {
+      const payload = message.payload as MessagePayloads["UNASSIGN_COLLECTION"]
+      unassignCollection(payload.itemIds, payload.collectionId)
+        .then((result) => sendResponse(result))
+        .catch((e) => sendResponse({ success: false, error: String(e) }))
+      return true
+    }
+
     case "BATCH_DOWNLOAD":
       batchDownload(message.payload as MessagePayloads["BATCH_DOWNLOAD"]).then((result) => sendResponse(result))
       return true
@@ -197,6 +255,7 @@ function collectAndNotify(
     width?: number
     height?: number
     author?: string
+    coverUrl?: string
   },
   callback?: (result: { success: boolean; error?: string; item?: MediaItem }) => void
 ) {
@@ -213,6 +272,7 @@ function collectAndNotify(
     width: mediaData.width,
     height: mediaData.height,
     author: mediaData.author,
+    coverUrl: mediaData.coverUrl,
   }
 
   saveItem(newItem).then((result) => {

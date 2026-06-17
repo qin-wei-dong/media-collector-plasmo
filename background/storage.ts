@@ -4,7 +4,7 @@ import { type MediaItem, STORAGE_KEY } from "../types"
 // Write lock: serialize all write operations to prevent race conditions
 let writeQueue: Promise<void> = Promise.resolve()
 
-function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
+export function enqueueWrite<T>(fn: () => Promise<T>): Promise<T> {
   const task = writeQueue.then(fn, fn)
   writeQueue = task.then(() => void 0, () => void 0)
   return task

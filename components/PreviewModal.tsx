@@ -85,6 +85,7 @@ export function PreviewModal({ item, siblings, onClose, onNavigate }: PreviewMod
         {isVideo ? (
           <video
             src={src}
+            poster={item.coverUrl}
             style={styles.video}
             controls
             autoPlay

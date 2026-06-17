@@ -51,6 +51,70 @@ export function stateInjector() {
     const user = card.user || card.author || {}
     const author = user.nickname || user.nickName || ""
 
+    function normalizeCoverUrl(value: string) {
+      const url = value.trim()
+      if (!/^https?:\/\//.test(url)) return ""
+      if (url.startsWith("data:") || url.startsWith("blob:")) return ""
+      return url.replace(/\?imageView2.*$/, "")
+    }
+
+    function isVideoUrl(url: string) {
+      const lower = url.toLowerCase()
+      return (
+        /\.(mp4|m3u8|mov|flv)(?:[?#]|$)/.test(lower) ||
+        lower.includes("sns-video") ||
+        lower.includes("/video/") ||
+        lower.includes("video/tos")
+      )
+    }
+
+    function scoreCoverUrl(url: string, path: string) {
+      const lowerUrl = url.toLowerCase()
+      const lowerPath = path.toLowerCase()
+      if (isVideoUrl(lowerUrl)) return -1
+      if (lowerPath.includes("avatar") || lowerUrl.includes("sns-avatar") || lowerUrl.includes("/avatar/")) return -1
+
+      let score = 0
+      if (/cover|poster|thumbnail|thumb|first[_-]?frame|preview/.test(lowerPath)) score += 80
+      if (/image|img|pic|photo/.test(lowerPath)) score += 40
+      if (/image|img|webpic|sns-img|sns-webpic/.test(lowerUrl)) score += 30
+      if (/image[_-]?list|imagelist|images/.test(lowerPath)) score += 20
+      return score
+    }
+
+    function extractVideoCover(video: any) {
+      const roots = [video, card.noteCard, card.note_card, card]
+      const seen = new Set<any>()
+      const candidates: Array<{ url: string; score: number; order: number }> = []
+      let order = 0
+
+      function visit(value: any, path: string, depth: number) {
+        if (value == null || depth > 7) return
+        if (typeof value === "string") {
+          const url = normalizeCoverUrl(value)
+          if (!url) return
+          const score = scoreCoverUrl(url, path)
+          if (score > 0) candidates.push({ url, score, order: order++ })
+          return
+        }
+        if (typeof value !== "object" || seen.has(value)) return
+        seen.add(value)
+
+        if (Array.isArray(value)) {
+          value.forEach((item, index) => visit(item, `${path}[${index}]`, depth + 1))
+          return
+        }
+
+        for (const key in value) {
+          visit(value[key], path ? `${path}.${key}` : key, depth + 1)
+        }
+      }
+
+      roots.forEach((root, index) => visit(root, index === 0 ? "video" : `card${index}`, 0))
+      candidates.sort((a, b) => b.score - a.score || a.order - b.order)
+      return candidates[0]?.url || ""
+    }
+
     const video = card.video
     if (video?.media?.stream) {
       const s = video.media.stream
@@ -58,9 +122,9 @@ export function stateInjector() {
         s.h264?.[0]?.master_url || s.h264?.[0]?.masterUrl ||
         s.h265?.[0]?.master_url || s.h265?.[0]?.masterUrl ||
         s.av1?.[0]?.master_url || s.av1?.[0]?.masterUrl
-      if (url) return { type: "video", images: [], videoUrl: url, title, author }
+      if (url) return { type: "video", images: [], videoUrl: url, coverUrl: extractVideoCover(video), title, author }
     }
-    if (video?.url) return { type: "video", images: [], videoUrl: video.url, title, author }
+    if (video?.url) return { type: "video", images: [], videoUrl: video.url, coverUrl: extractVideoCover(video), title, author }
 
     const list = card.image_list || card.imageList || card.images || []
     const images = (Array.isArray(list) ? list : [])

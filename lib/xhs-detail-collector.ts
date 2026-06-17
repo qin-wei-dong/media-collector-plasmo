@@ -115,6 +115,48 @@ function findMediaEl(scope: ParentNode): Element | null {
   return bestImg
 }
 
+function normalizeCoverUrl(value: string): string {
+  const url = value.trim()
+  if (!/^https?:\/\//.test(url)) return ""
+  if (url.startsWith("data:") || url.startsWith("blob:")) return ""
+  return url.replace(/\?imageView2.*$/, "")
+}
+
+function getElementImageUrl(el: Element): string {
+  if (el instanceof HTMLImageElement) {
+    return normalizeCoverUrl(el.currentSrc || el.src || "")
+  }
+  const bg = window.getComputedStyle(el).backgroundImage
+  if (bg && bg !== "none") {
+    const match = bg.match(/url\(["']?(.+?)["']?\)/)
+    if (match?.[1]) return normalizeCoverUrl(match[1])
+  }
+  return ""
+}
+
+function findVisibleCoverImage(scope: ParentNode): string {
+  const selectors = ["img", "[style*='background-image']", "[class*='cover']", "[class*='poster']", "[class*='image']", "[class*='media']"]
+  let bestUrl = ""
+  let bestVis = 0
+
+  for (const el of Array.from(scope.querySelectorAll(selectors.join(",")))) {
+    if (!isVisible(el)) continue
+    const url = getElementImageUrl(el)
+    if (!url || isAvatarOrIcon(url)) continue
+
+    const rect = el.getBoundingClientRect()
+    if (rect.width < 80 || rect.height < 80) continue
+
+    const vis = visibleArea(rect)
+    if (vis > bestVis) {
+      bestVis = vis
+      bestUrl = url
+    }
+  }
+
+  return bestUrl
+}
+
 function injectStyles() {
   if (document.getElementById(STYLE_ID)) return
   const style = document.createElement("style")
@@ -264,6 +306,15 @@ export function startDetailCollector() {
   }
 
   function collectVideo(media: XHSNoteMedia, noteId: string) {
+    const scope: ParentNode = currentContainer || document
+    const mediaEl = findMediaEl(scope)
+    const domCoverUrl =
+      mediaEl instanceof HTMLVideoElement
+        ? normalizeCoverUrl(mediaEl.poster || "") || findVisibleCoverImage(scope)
+        : mediaEl instanceof HTMLImageElement
+          ? normalizeCoverUrl(mediaEl.currentSrc || mediaEl.src || "")
+          : ""
+
     chrome.runtime.sendMessage(
       {
         type: "COLLECT_MEDIA",
@@ -275,6 +326,7 @@ export function startDetailCollector() {
           sourceUrl: location.href,
           noteId,
           author: media.author,
+          coverUrl: media.coverUrl || domCoverUrl || undefined,
         },
       },
       (resp) => {
@@ -290,8 +342,6 @@ export function startDetailCollector() {
   }
 
   function collectImages(images: XHSImage[], noteId: string, title: string, author: string) {
-    // 首图作为整个笔记的封面(给 popup Hero/MediaCard 显示用)
-    const coverUrl = images[0]?.url || ""
     chrome.runtime.sendMessage(
       {
         type: "COLLECT_NOTE_IMAGES",
@@ -302,7 +352,7 @@ export function startDetailCollector() {
             width: img.width,
             height: img.height,
             groupIndex: i,
-            coverUrl, // 每条都带封面,方便 popup 取
+            coverUrl: img.url,
           })),
           title: title || "未命名笔记",
           sourceUrl: location.href,

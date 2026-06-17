@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import type { MediaItem, MediaType, Platform } from "../types"
+import type { Collection, MediaItem, MediaType, Platform } from "../types"
 import { PLATFORM_LABELS } from "../types"
-import { getAvatarGradient, getTimeBucket, TIME_ORDER, type ThemeTokens } from "../lib/design-tokens"
+import { getTimeBucket, TIME_ORDER, type ThemeTokens } from "../lib/design-tokens"
 import { ThemeProvider, useTheme } from "../lib/use-theme"
 import { PreviewModal } from "../components/PreviewModal"
 
 type Scope = "all" | "recent" | "uncategorized"
 type ViewMode = "grid" | "list"
+type DialogState =
+  | { type: "create" }
+  | { type: "assign" }
+  | { type: "rename"; collection: Collection }
+  | { type: "delete"; collection: Collection }
+  | null
 type IconName =
   | "box"
   | "bookmark"
@@ -23,6 +29,7 @@ type IconName =
   | "search"
   | "trash"
   | "user"
+  | "view"
 
 interface Notice {
   message: string
@@ -85,8 +92,10 @@ function LibraryPage() {
   const searchRef = useRef<HTMLInputElement | null>(null)
 
   const [items, setItems] = useState<MediaItem[]>([])
+  const [collections, setCollections] = useState<Collection[]>([])
   const [search, setSearch] = useState("")
   const [scope, setScope] = useState<Scope>("all")
+  const [collectionFilter, setCollectionFilter] = useState("")
   const [platformFilter, setPlatformFilter] = useState<Platform | "">("")
   const [typeFilter, setTypeFilter] = useState<MediaType | "">("")
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
@@ -94,6 +103,7 @@ function LibraryPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
+  const [dialog, setDialog] = useState<DialogState>(null)
   const [batchDownloading, setBatchDownloading] = useState(false)
 
   useEffect(() => {
@@ -106,9 +116,16 @@ function LibraryPage() {
     })
   }, [])
 
+  const loadCollections = useCallback(() => {
+    chrome.runtime.sendMessage({ type: "GET_COLLECTIONS" }, (resp) => {
+      if (resp?.collections) setCollections(resp.collections)
+    })
+  }, [])
+
   useEffect(() => {
     loadItems()
-  }, [loadItems])
+    loadCollections()
+  }, [loadCollections, loadItems])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -175,10 +192,20 @@ function LibraryPage() {
   const sidebarCounts = useMemo(() => {
     return {
       recent: items.filter((item) => getTimeBucket(item.collectedAt) === "今天").length,
-      uncategorized: items.filter((item) => !item.author).length,
+      uncategorized: items.filter((item) => !item.collectionIds?.length).length,
       xhs: items.filter((item) => item.platform === "xiaohongshu").length,
       douyin: items.filter((item) => item.platform === "douyin").length,
     }
+  }, [items])
+
+  const collectionCounts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const item of items) {
+      for (const collectionId of item.collectionIds || []) {
+        map.set(collectionId, (map.get(collectionId) || 0) + 1)
+      }
+    }
+    return map
   }, [items])
 
   const noteImageCounts = useMemo(() => {
@@ -193,7 +220,8 @@ function LibraryPage() {
     const q = search.trim().toLowerCase()
     return items.filter((item) => {
       if (scope === "recent" && getTimeBucket(item.collectedAt) !== "今天") return false
-      if (scope === "uncategorized" && item.author) return false
+      if (scope === "uncategorized" && item.collectionIds?.length) return false
+      if (collectionFilter && !item.collectionIds?.includes(collectionFilter)) return false
       if (platformFilter && item.platform !== platformFilter) return false
       if (typeFilter && item.type !== typeFilter) return false
       if (q) {
@@ -202,7 +230,7 @@ function LibraryPage() {
       }
       return true
     })
-  }, [items, platformFilter, scope, search, typeFilter])
+  }, [collectionFilter, items, platformFilter, scope, search, typeFilter])
 
   const sortedItems = useMemo(() => {
     return [...filteredItems].sort((a, b) => {
@@ -224,13 +252,15 @@ function LibraryPage() {
 
   const selectedItems = useMemo(() => items.filter((item) => selectedIds.has(item.id)), [items, selectedIds])
   const selectedCount = selectedIds.size
+  const allCurrentSelected = sortedItems.length > 0 && sortedItems.every((item) => selectedIds.has(item.id))
 
   const pageTitle = useMemo(() => {
+    if (collectionFilter) return collections.find((collection) => collection.id === collectionFilter)?.name || "收藏夹"
     if (platformFilter) return PLATFORM_LABELS[platformFilter]
     if (scope === "recent") return "最近采集"
     if (scope === "uncategorized") return "未分类"
     return "全部素材"
-  }, [platformFilter, scope])
+  }, [collectionFilter, collections, platformFilter, scope])
 
   const previewSiblings = useMemo(() => {
     if (!previewItem) return []
@@ -240,12 +270,20 @@ function LibraryPage() {
 
   const selectScope = (next: Scope) => {
     setScope(next)
+    setCollectionFilter("")
     if (next !== "all") setPlatformFilter("")
   }
 
   const selectPlatform = (next: Platform) => {
     setScope("all")
+    setCollectionFilter("")
     setPlatformFilter((current) => (current === next ? "" : next))
+  }
+
+  const selectCollection = (collectionId: string) => {
+    setScope("all")
+    setPlatformFilter("")
+    setCollectionFilter((current) => (current === collectionId ? "" : collectionId))
   }
 
   const toggleItem = (item: MediaItem) => {
@@ -338,12 +376,81 @@ function LibraryPage() {
     chrome.tabs.create({ url: item.sourceUrl, active: false })
   }
 
-  const createCollection = () => {
-    setNotice({ kind: "info", message: "收藏夹管理将在 M3 开放" })
+  const createCollection = (name: string, color: string) => {
+    chrome.runtime.sendMessage({ type: "CREATE_COLLECTION", payload: { name, color } }, (resp) => {
+      if (resp?.success) {
+        setNotice({ kind: "success", message: `已创建收藏夹「${resp.collection?.name || name}」` })
+        setDialog(null)
+        loadCollections()
+      } else {
+        setNotice({ kind: "error", message: resp?.error || "创建收藏夹失败" })
+      }
+    })
   }
 
-  const addToCollection = () => {
-    setNotice({ kind: "info", message: "加入收藏夹将在 M3 开放" })
+  const renameCollection = (collection: Collection, name: string) => {
+    chrome.runtime.sendMessage({ type: "RENAME_COLLECTION", payload: { id: collection.id, name } }, (resp) => {
+      if (resp?.success) {
+        setNotice({ kind: "success", message: "已重命名收藏夹" })
+        setDialog(null)
+        loadCollections()
+      } else {
+        setNotice({ kind: "error", message: resp?.error || "重命名失败" })
+      }
+    })
+  }
+
+  const deleteCollection = (collection: Collection) => {
+    chrome.runtime.sendMessage({ type: "DELETE_COLLECTION", payload: { id: collection.id } }, (resp) => {
+      if (resp?.success) {
+        if (collectionFilter === collection.id) setCollectionFilter("")
+        setNotice({ kind: "success", message: `已删除收藏夹「${collection.name}」` })
+        setDialog(null)
+        loadCollections()
+        loadItems()
+      } else {
+        setNotice({ kind: "error", message: resp?.error || "删除收藏夹失败" })
+      }
+    })
+  }
+
+  const assignSelectedToCollection = (collection: Collection) => {
+    if (!selectedCount) return
+    chrome.runtime.sendMessage(
+      {
+        type: "ASSIGN_COLLECTION",
+        payload: { itemIds: selectedItems.map((item) => item.id), collectionId: collection.id },
+      },
+      (resp) => {
+        if (resp?.success) {
+          setNotice({ kind: "success", message: `已加入「${collection.name}」` })
+          setDialog(null)
+          clearSelection()
+          loadItems()
+        } else {
+          setNotice({ kind: "error", message: resp?.error || "加入收藏夹失败" })
+        }
+      }
+    )
+  }
+
+  const unassignSelectedFromCollection = () => {
+    if (!selectedCount || !collectionFilter) return
+    chrome.runtime.sendMessage(
+      {
+        type: "UNASSIGN_COLLECTION",
+        payload: { itemIds: selectedItems.map((item) => item.id), collectionId: collectionFilter },
+      },
+      (resp) => {
+        if (resp?.success) {
+          setNotice({ kind: "success", message: "已从当前收藏夹移除" })
+          clearSelection()
+          loadItems()
+        } else {
+          setNotice({ kind: "error", message: resp?.error || "移除失败" })
+        }
+      }
+    )
   }
 
   return (
@@ -367,7 +474,7 @@ function LibraryPage() {
             icon="grid"
             label="全部素材"
             count={items.length}
-            active={scope === "all" && !platformFilter}
+            active={scope === "all" && !platformFilter && !collectionFilter}
             onClick={() => selectScope("all")}
           />
           <SidebarItem
@@ -389,15 +496,21 @@ function LibraryPage() {
         <SidebarGroup
           title="我的收藏夹"
           actionLabel="+ 新建"
-          onAction={createCollection}
+          onAction={() => setDialog({ type: "create" })}
         >
-          {["618 选题", "穿搭对标", "美食探店", "口播脚本灵感"].map((name) => (
+          {collections.length === 0 && (
+            <div style={styles.sidebarEmpty}>还没有收藏夹</div>
+          )}
+          {collections.map((collection) => (
             <SidebarItem
-              key={name}
-              dot={getAvatarGradient(name)}
-              label={name}
-              count={0}
-              onClick={() => setNotice({ kind: "info", message: "收藏夹筛选将在 M3 开放" })}
+              key={collection.id}
+              dot={collection.color}
+              label={collection.name}
+              count={collectionCounts.get(collection.id) || 0}
+              active={collectionFilter === collection.id}
+              onClick={() => selectCollection(collection.id)}
+              onRename={() => setDialog({ type: "rename", collection })}
+              onDelete={() => setDialog({ type: "delete", collection })}
             />
           ))}
         </SidebarGroup>
@@ -497,11 +610,30 @@ function LibraryPage() {
           </button>
 
           <div style={styles.bulkRight}>
-            <span style={styles.selectedText}>已选 <b>{selectedCount}</b> 项</span>
-            <button className="mc-library-button" style={styles.bulkGhost} onClick={addToCollection} disabled={!selectedCount}>
-              <Icon name="box" size={15} />
-              加入收藏夹
+            <button
+              className="mc-library-button"
+              style={{ ...styles.bulkGhost, ...(allCurrentSelected ? styles.bulkGhostActive : {}) }}
+              onClick={toggleSelectAll}
+              disabled={!sortedItems.length}
+            >
+              <Icon name="check" size={15} />
+              {allCurrentSelected ? "取消全选" : "全选"}
             </button>
+            <span style={styles.selectedText}>已选 <b>{selectedCount}</b> 项</span>
+            <button
+              className="mc-library-button"
+              style={styles.bulkGhost}
+              onClick={() => setDialog(collections.length ? { type: "assign" } : { type: "create" })}
+              disabled={!selectedCount}
+            >
+              <Icon name="box" size={15} />
+              {collections.length ? "加入收藏夹" : "新建收藏夹"}
+            </button>
+            {collectionFilter && (
+              <button className="mc-library-button" style={styles.bulkGhost} onClick={unassignSelectedFromCollection} disabled={!selectedCount}>
+                移出收藏夹
+              </button>
+            )}
             <button className="mc-library-button" style={{ ...styles.bulkPrimary, ...(batchDownloading || !selectedCount ? styles.disabled : {}) }} onClick={() => downloadItems(selectedItems)} disabled={batchDownloading || !selectedCount}>
               <Icon name="download" size={15} />
               {batchDownloading ? "导出中" : `导出 ${selectedCount || ""} 项`}
@@ -568,6 +700,18 @@ function LibraryPage() {
           onDismiss={() => setNotice(null)}
         />
       )}
+
+      {dialog && (
+        <CollectionDialog
+          dialog={dialog}
+          collections={collections}
+          onClose={() => setDialog(null)}
+          onCreate={createCollection}
+          onRename={renameCollection}
+          onDelete={deleteCollection}
+          onAssign={assignSelectedToCollection}
+        />
+      )}
     </div>
   )
 
@@ -606,6 +750,8 @@ function LibraryPage() {
     count,
     active,
     onClick,
+    onRename,
+    onDelete,
   }: {
     icon?: IconName
     dot?: string
@@ -613,6 +759,8 @@ function LibraryPage() {
     count?: number
     active?: boolean
     onClick?: () => void
+    onRename?: () => void
+    onDelete?: () => void
   }) {
     return (
       <button
@@ -624,6 +772,38 @@ function LibraryPage() {
         {dot && <span style={{ ...styles.dot, background: dot.startsWith("linear-gradient") ? undefined : dot, backgroundImage: dot.startsWith("linear-gradient") ? dot : undefined }} />}
         <span style={styles.sidebarLabel}>{label}</span>
         {typeof count === "number" && <span style={styles.sidebarCount}>{count}</span>}
+        {(onRename || onDelete) && (
+          <span style={styles.sidebarActions}>
+            {onRename && (
+              <span
+                style={styles.sidebarMini}
+                role="button"
+                tabIndex={0}
+                aria-label={`重命名${label}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRename()
+                }}
+              >
+                改
+              </span>
+            )}
+            {onDelete && (
+              <span
+                style={styles.sidebarMini}
+                role="button"
+                tabIndex={0}
+                aria-label={`删除${label}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+              >
+                删
+              </span>
+            )}
+          </span>
+        )}
       </button>
     )
   }
@@ -682,8 +862,10 @@ function LibraryCell({
   const theme = useTheme()
   const styles = useMemo(() => makeStyles(theme), [theme])
   const [imgError, setImgError] = useState(false)
-  const cover = item.coverUrl || item.url
+  const cover = getDisplayCover(item)
   const isVideo = item.type === "video"
+  const showCoverImage = cover && !imgError
+  const showVideoFrame = isVideo && !cover && !imgError
   const showMultiBadge = !isVideo && imageCount && imageCount > 1
   const platformColor = item.platform === "xiaohongshu" ? theme.xhs : item.platform === "douyin" ? theme.douyin : theme.textTertiary
 
@@ -693,23 +875,45 @@ function LibraryCell({
       style={{ ...styles.cell, ...(selected ? styles.cellSelected : {}) }}
       role="button"
       tabIndex={0}
-      onClick={onPreview}
+      onClick={onToggleSelect}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault()
-          onPreview()
+          onToggleSelect()
         }
       }}
-      aria-label={`预览素材 ${item.title || "未命名素材"}`}
+      aria-label={`${selected ? "取消选择" : "选择"}素材 ${item.title || "未命名素材"}`}
+      aria-pressed={selected}
     >
-      {!imgError && (
+      {showCoverImage ? (
         <img
           src={cover}
           alt=""
           style={styles.cellImage}
           onError={() => setImgError(true)}
         />
+      ) : showVideoFrame ? (
+        <video
+          src={item.url}
+          style={styles.cellImage}
+          muted
+          playsInline
+          preload="metadata"
+          onLoadedMetadata={(e) => {
+            const video = e.currentTarget
+            if (Number.isFinite(video.duration) && video.duration > 1) video.currentTime = 1
+          }}
+          onError={() => setImgError(true)}
+          aria-hidden="true"
+        />
+      ) : (
+        <div style={styles.mediaPlaceholder} aria-hidden="true">
+          <Icon name={isVideo ? "play" : "image"} size={28} fill={isVideo ? "currentColor" : "none"} />
+          <span>{isVideo ? "视频素材" : "图片加载失败"}</span>
+        </div>
       )}
+
+      {selected && <div style={styles.cellSelectedFrame} aria-hidden="true" />}
 
       {showMultiBadge ? (
         <div style={styles.mediaBadge}>
@@ -725,6 +929,19 @@ function LibraryCell({
           <Icon name="play" size={12} fill="currentColor" />
         </div>
       )}
+
+      <button
+        className="mc-library-button"
+        style={styles.previewAction}
+        onClick={(e) => {
+          e.stopPropagation()
+          onPreview()
+        }}
+        aria-label="预览该素材"
+        title="预览"
+      >
+        <Icon name="view" size={14} />
+      </button>
 
       <button
         className="mc-library-check"
@@ -783,20 +1000,190 @@ function LibraryRow({
 }) {
   const theme = useTheme()
   const styles = useMemo(() => makeStyles(theme), [theme])
-  const cover = item.coverUrl || item.url
+  const [imgError, setImgError] = useState(false)
+  const cover = getDisplayCover(item)
+  const isVideo = item.type === "video"
+  const showCoverImage = cover && !imgError
+  const showVideoFrame = isVideo && !cover && !imgError
   return (
-    <div style={{ ...styles.row, ...(selected ? styles.rowSelected : {}) }}>
-      <button style={{ ...styles.rowCheck, ...(selected ? styles.checkActive : {}) }} onClick={onToggleSelect} aria-label={selected ? "取消选择该素材" : "选择该素材"}>
+    <div style={{ ...styles.row, ...(selected ? styles.rowSelected : {}) }} onClick={onToggleSelect}>
+      <button
+        style={{ ...styles.rowCheck, ...(selected ? styles.checkActive : {}) }}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSelect()
+        }}
+        aria-label={selected ? "取消选择该素材" : "选择该素材"}
+      >
         {selected && <Icon name="check" size={13} />}
       </button>
-      <button style={styles.rowThumbButton} onClick={onPreview}>
-        <img src={cover} alt="" style={styles.rowThumb} />
+      <button
+        style={styles.rowThumbButton}
+        onClick={(e) => {
+          e.stopPropagation()
+          onPreview()
+        }}
+        aria-label="预览该素材"
+      >
+        {showCoverImage ? (
+          <img src={cover} alt="" style={styles.rowThumb} onError={() => setImgError(true)} />
+        ) : showVideoFrame ? (
+          <video
+            src={item.url}
+            style={styles.rowThumb}
+            muted
+            playsInline
+            preload="metadata"
+            onLoadedMetadata={(e) => {
+              const video = e.currentTarget
+              if (Number.isFinite(video.duration) && video.duration > 1) video.currentTime = 1
+            }}
+            onError={() => setImgError(true)}
+            aria-hidden="true"
+          />
+        ) : (
+          <div style={styles.rowPlaceholder} aria-hidden="true">
+            <Icon name={isVideo ? "play" : "image"} size={17} fill={isVideo ? "currentColor" : "none"} />
+          </div>
+        )}
       </button>
-      <button style={styles.rowMeta} onClick={onPreview}>
+      <button
+        style={styles.rowMeta}
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleSelect()
+        }}
+      >
         <span style={styles.rowTitle}>{item.title || "未命名素材"}</span>
         <span style={styles.rowSub}>{item.author || "未分类"} · {PLATFORM_LABELS[item.platform]} · {item.type === "video" ? "视频" : "图片"}</span>
       </button>
       <span style={styles.rowDate}>{new Date(item.collectedAt).toLocaleDateString("zh-CN")}</span>
+    </div>
+  )
+}
+
+function getDisplayCover(item: MediaItem): string {
+  if (item.type === "image") return item.url || item.coverUrl || ""
+  return item.coverUrl || ""
+}
+
+function CollectionDialog({
+  dialog,
+  collections,
+  onClose,
+  onCreate,
+  onRename,
+  onDelete,
+  onAssign,
+}: {
+  dialog: Exclude<DialogState, null>
+  collections: Collection[]
+  onClose: () => void
+  onCreate: (name: string, color: string) => void
+  onRename: (collection: Collection, name: string) => void
+  onDelete: (collection: Collection) => void
+  onAssign: (collection: Collection) => void
+}) {
+  const theme = useTheme()
+  const styles = useMemo(() => makeStyles(theme), [theme])
+  const colorOptions = [
+    "#FF5A5F",
+    "#5AC8FA",
+    "#FFD60A",
+    "#AF52DE",
+    theme.xhs,
+    theme.douyin,
+  ]
+  const [name, setName] = useState(dialog.type === "rename" ? dialog.collection.name : "")
+  const [color, setColor] = useState(dialog.type === "rename" ? dialog.collection.color : colorOptions[0])
+
+  const title =
+    dialog.type === "create"
+      ? "新建收藏夹"
+      : dialog.type === "rename"
+        ? "重命名收藏夹"
+        : dialog.type === "delete"
+          ? "删除收藏夹"
+          : "加入收藏夹"
+
+  return (
+    <div style={styles.dialogOverlay} onClick={onClose}>
+      <div style={styles.dialog} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.dialogHead}>
+          <div style={styles.dialogTitle}>{title}</div>
+          <button style={styles.dialogClose} onClick={onClose} aria-label="关闭">
+            ×
+          </button>
+        </div>
+
+        {(dialog.type === "create" || dialog.type === "rename") && (
+          <>
+            <input
+              style={styles.dialogInput}
+              placeholder="收藏夹名称"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+            <div style={styles.colorGrid}>
+              {colorOptions.map((option) => (
+                <button
+                  key={option}
+                  style={{
+                    ...styles.colorButton,
+                    background: option,
+                    ...(color === option ? styles.colorButtonActive : {}),
+                  }}
+                  onClick={() => setColor(option)}
+                  aria-label={`选择颜色 ${option}`}
+                />
+              ))}
+            </div>
+            <button
+              className="mc-library-button"
+              style={styles.dialogPrimary}
+              onClick={() => {
+                if (dialog.type === "create") onCreate(name, color)
+                else onRename(dialog.collection, name)
+              }}
+            >
+              {dialog.type === "create" ? "创建" : "保存"}
+            </button>
+          </>
+        )}
+
+        {dialog.type === "assign" && (
+          <div style={styles.collectionList}>
+            {collections.length === 0 ? (
+              <div style={styles.dialogEmpty}>还没有收藏夹，先新建一个吧</div>
+            ) : (
+              collections.map((collection) => (
+                <button
+                  key={collection.id}
+                  className="mc-library-button"
+                  style={styles.collectionChoice}
+                  onClick={() => onAssign(collection)}
+                >
+                  <span style={{ ...styles.dot, background: collection.color }} />
+                  <span>{collection.name}</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
+
+        {dialog.type === "delete" && (
+          <>
+            <div style={styles.dialogBody}>
+              删除「{dialog.collection.name}」后，素材不会被删除，只会移出该收藏夹。
+            </div>
+            <div style={styles.dialogActions}>
+              <button className="mc-library-button" style={styles.dialogGhost} onClick={onClose}>取消</button>
+              <button className="mc-library-button" style={styles.dialogDanger} onClick={() => onDelete(dialog.collection)}>删除</button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }
@@ -886,6 +1273,8 @@ function Icon({
       return <svg {...common}><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /></svg>
     case "user":
       return <svg {...common}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+    case "view":
+      return <svg {...common}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>
   }
 }
 
@@ -1008,6 +1397,26 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       fontSize: 11,
       color: textTertiary,
       fontWeight: 500,
+    },
+    sidebarActions: {
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 6,
+      marginLeft: 8,
+    },
+    sidebarMini: {
+      fontSize: 10,
+      color: textTertiary,
+      border: `1px solid ${theme.hairlineSoft}`,
+      borderRadius: theme.r.xs,
+      padding: "2px 5px",
+      lineHeight: 1,
+      flexShrink: 0,
+    },
+    sidebarEmpty: {
+      fontSize: 11,
+      color: textTertiary,
+      padding: "4px 8px 2px",
     },
     dot: {
       width: 9,
@@ -1238,6 +1647,10 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       color: "rgba(255,255,255,0.68)",
       whiteSpace: "nowrap",
     },
+    bulkGhostActive: {
+      background: "rgba(10,132,255,0.16)",
+      color: "#4da3ff",
+    },
     bulkPrimary: {
       border: "none",
       borderRadius: theme.r.sm,
@@ -1310,6 +1723,15 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       outline: `3px solid ${theme.accent}`,
       outlineOffset: -3,
     },
+    cellSelectedFrame: {
+      position: "absolute",
+      inset: 0,
+      border: `3px solid ${theme.accent}`,
+      borderRadius: theme.r.md,
+      boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.16)",
+      pointerEvents: "none",
+      zIndex: 4,
+    },
     cellImage: {
       position: "absolute",
       inset: 0,
@@ -1317,6 +1739,19 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       height: "100%",
       objectFit: "cover",
       display: "block",
+    },
+    mediaPlaceholder: {
+      position: "absolute",
+      inset: 0,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      background: "linear-gradient(145deg, rgba(46,46,50,0.96), rgba(18,18,20,0.98))",
+      color: "rgba(255,255,255,0.62)",
+      fontSize: 12,
+      fontWeight: 600,
     },
     mediaBadge: {
       position: "absolute",
@@ -1356,6 +1791,25 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       placeItems: "center",
       color: "#fff",
     },
+    previewAction: {
+      position: "absolute",
+      top: 8,
+      right: 38,
+      width: 28,
+      height: 28,
+      borderRadius: theme.r.pill,
+      border: "1px solid rgba(255,255,255,0.22)",
+      background: "rgba(0,0,0,0.46)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
+      color: "#fff",
+      cursor: "pointer",
+      display: "grid",
+      placeItems: "center",
+      padding: 0,
+      zIndex: 2,
+      boxShadow: "0 4px 12px rgba(0,0,0,0.26)",
+    },
     check: {
       position: "absolute",
       top: 8,
@@ -1367,13 +1821,14 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       background: "rgba(0,0,0,0.25)",
       backdropFilter: "blur(4px)",
       WebkitBackdropFilter: "blur(4px)",
-      opacity: 0,
+      opacity: 1,
       transition: `all ${theme.durFast} ${theme.easeOut}`,
       display: "grid",
       placeItems: "center",
       color: "#fff",
       cursor: "pointer",
       padding: 0,
+      zIndex: 5,
     },
     checkActive: {
       opacity: 1,
@@ -1468,6 +1923,14 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       objectFit: "cover",
       display: "block",
     },
+    rowPlaceholder: {
+      width: "100%",
+      height: "100%",
+      display: "grid",
+      placeItems: "center",
+      background: "linear-gradient(145deg, rgba(46,46,50,0.96), rgba(18,18,20,0.98))",
+      color: "rgba(255,255,255,0.62)",
+    },
     rowMeta: {
       minWidth: 0,
       textAlign: "left",
@@ -1505,6 +1968,143 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       placeItems: "center",
       color: textTertiary,
       fontSize: 14,
+    },
+    dialogOverlay: {
+      position: "fixed",
+      inset: 0,
+      zIndex: 130,
+      background: "rgba(0,0,0,0.48)",
+      backdropFilter: theme.glassBlur,
+      WebkitBackdropFilter: theme.glassBlur,
+      display: "grid",
+      placeItems: "center",
+      padding: 24,
+    },
+    dialog: {
+      width: 360,
+      maxWidth: "100%",
+      background: "rgba(40,40,42,0.96)",
+      border: `1px solid ${theme.hairline}`,
+      borderRadius: theme.r.lg,
+      boxShadow: theme.shadowFloat,
+      padding: 16,
+      color: "#fff",
+    },
+    dialogHead: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      marginBottom: 14,
+    },
+    dialogTitle: {
+      fontSize: 17,
+      fontWeight: 700,
+      letterSpacing: -0.3,
+    },
+    dialogClose: {
+      width: 28,
+      height: 28,
+      borderRadius: theme.r.pill,
+      border: "none",
+      background: card,
+      color: theme.textSecondary,
+      cursor: "pointer",
+      display: "grid",
+      placeItems: "center",
+      fontSize: 18,
+      lineHeight: 1,
+    },
+    dialogInput: {
+      width: "100%",
+      height: 38,
+      border: `1px solid ${theme.hairline}`,
+      background: card,
+      color: "#fff",
+      borderRadius: theme.r.sm,
+      padding: "0 12px",
+      outline: "none",
+      marginBottom: 12,
+    },
+    colorGrid: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 14,
+    },
+    colorButton: {
+      width: 26,
+      height: 26,
+      borderRadius: theme.r.pill,
+      border: "2px solid transparent",
+      cursor: "pointer",
+    },
+    colorButtonActive: {
+      borderColor: "#fff",
+      boxShadow: `0 0 0 2px ${theme.accent}`,
+    },
+    dialogPrimary: {
+      width: "100%",
+      height: 36,
+      border: "none",
+      borderRadius: theme.r.sm,
+      background: theme.accent,
+      color: "#fff",
+      fontWeight: 600,
+      cursor: "pointer",
+    },
+    collectionList: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8,
+    },
+    collectionChoice: {
+      height: 38,
+      border: `1px solid ${theme.hairlineSoft}`,
+      borderRadius: theme.r.sm,
+      background: card,
+      color: "#fff",
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "0 12px",
+      cursor: "pointer",
+      textAlign: "left",
+    },
+    dialogEmpty: {
+      padding: "18px 8px",
+      textAlign: "center",
+      color: textTertiary,
+      fontSize: 13,
+    },
+    dialogBody: {
+      color: theme.textSecondary,
+      fontSize: 13,
+      lineHeight: 1.5,
+      marginBottom: 14,
+    },
+    dialogActions: {
+      display: "flex",
+      justifyContent: "flex-end",
+      gap: 8,
+    },
+    dialogGhost: {
+      height: 34,
+      border: "none",
+      borderRadius: theme.r.sm,
+      background: card,
+      color: theme.textSecondary,
+      padding: "0 14px",
+      cursor: "pointer",
+    },
+    dialogDanger: {
+      height: 34,
+      border: "none",
+      borderRadius: theme.r.sm,
+      background: theme.dangerBg,
+      color: theme.danger,
+      padding: "0 14px",
+      cursor: "pointer",
+      fontWeight: 600,
     },
     toast: {
       position: "fixed",
