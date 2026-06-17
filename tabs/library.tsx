@@ -230,16 +230,30 @@ function LibraryPage() {
     loadCollections()
   }, [loadCollections, loadItems])
 
-  // M5 Task 4:库页快捷键补齐 — Cmd/Ctrl+K 聚焦搜索,Esc 优先级 对话框 > 预览 > 搜索
+  // M5 Task 4 + M6 Task 6:库页快捷键补齐
+  // - Cmd/Ctrl+K 聚焦搜索(已存在)
+  // - Esc 优先级 对话框 > 预览 > 搜索(已存在)
+  // - Cmd/Ctrl+A 全选当前筛选结果(输入态不拦截)
+  // - Delete/Backspace 删除选中(输入态不拦截,走撤销 Toast)
+  // - E 导出选中(非输入态)
+  // - C 打开加入收藏夹 / 移动到收藏夹 dialog(非输入态)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const isTyping =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable === true
+
+      // Cmd/Ctrl+K:聚焦搜索(任何时候都生效,即使是输入态,因为这是"打开搜索"的快捷键)
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault()
         searchRef.current?.focus()
         return
       }
+
+      // Esc:关闭对话框 > 关闭预览 > 清空搜索(优先级)
       if (e.key === "Escape") {
-        // 对话框优先:模态未关闭前,Esc 关闭模态而非预览/搜索
         if (dialog) {
           e.preventDefault()
           setDialog(null)
@@ -255,11 +269,58 @@ function LibraryPage() {
           setSearch("")
           searchRef.current?.blur()
         }
+        return
+      }
+
+      // 输入态下,以下快捷键全部不拦截,避免污染文本编辑
+      if (isTyping) return
+
+      // Cmd/Ctrl+A:全选当前筛选结果
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+        e.preventDefault()
+        toggleSelectAll()
+        return
+      }
+
+      // Delete / Backspace:删除选中(走撤销 Toast,非永久执行)
+      if (e.key === "Delete" || e.key === "Backspace") {
+        if (selectedCount > 0 && !batchDownloading) {
+          e.preventDefault()
+          removeSelected()
+        }
+        return
+      }
+
+      // E:导出选中(非输入态)
+      if (e.key === "e" || e.key === "E") {
+        if (selectedCount > 0 && !batchDownloading) {
+          e.preventDefault()
+          downloadItems(selectedItems)
+        }
+        return
+      }
+
+      // C:打开加入收藏夹 / 移动到收藏夹 dialog(非输入态)
+      if (e.key === "c" || e.key === "C") {
+        if (selectedCount > 0) {
+          e.preventDefault()
+          setDialog(collections.length ? { type: "assign" } : { type: "create" })
+        }
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [dialog, previewItem])
+  }, [
+    dialog,
+    previewItem,
+    selectedCount,
+    batchDownloading,
+    collections.length,
+    toggleSelectAll,
+    removeSelected,
+    downloadItems,
+    selectedItems,
+  ])
 
   // 切换任何筛选(范围/平台/收藏夹/类型/搜索)时清空选中:
   // selectedItems 基于全量 items,不清空则被隐藏的素材仍会随导出带出、"已选 N 项"也会失真。
