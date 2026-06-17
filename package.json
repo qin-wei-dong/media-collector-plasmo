@@ -1,7 +1,7 @@
 {
   "name": "media-collector-plasmo",
   "displayName": "素材采集助手",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "一键采集小红书、抖音的图片和视频素材",
   "scripts": {
     "dev": "plasmo dev",
