@@ -1,5 +1,30 @@
+# Dependencies / build artifacts
 node_modules
 build
 .plasmo
 .env
+
+# Tooling caches
 .codegraph/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+
+# Package manager — pnpm only, lock is pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Personal Claude skills (项目级不需要,放 ~/.claude/skills/)
+.agents/
+
+# a11y audit output directory(脚本:pnpm audit:a11y)
+audit/
+
+# Plasmo scaffold leftovers — 项目用 inline style + token,不依赖这些
+style.css
+tailwind.config.js
+postcss.config.js
