@@ -115,7 +115,7 @@ chrome.commands.onCommand.addListener((command) => {
       if (response?.media) {
         collectAndNotify(response.media)
       } else {
-        showNote("未检测到素材", "小红书：请点击笔记弹出浮层后，点击「采集素材」按钮；抖音：请将鼠标悬停在视频上")
+        showNote("未检测到素材", "请在小红书中点开笔记浮层后，点击「采集素材」按钮")
       }
     })
   })

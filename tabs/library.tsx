@@ -628,7 +628,7 @@ function LibraryPage() {
         } else {
           setNotice({
             kind: "error",
-            message: resp?.errors?.[0] || "导出失败，请确保小红书或抖音页面可访问",
+            message: resp?.errors?.[0] || "导出失败，请确保小红书页面可访问",
           })
         }
       }
@@ -888,13 +888,6 @@ function LibraryPage() {
             active={platformFilter === "xiaohongshu"}
             onClick={() => selectPlatform("xiaohongshu")}
           />
-          <SidebarItem
-            dot={theme.douyin}
-            label="抖音"
-            count={sidebarCounts.douyin}
-            active={platformFilter === "douyin"}
-            onClick={() => selectPlatform("douyin")}
-          />
         </SidebarGroup>
 
         <div style={styles.sidebarFoot}>
@@ -986,7 +979,6 @@ function LibraryPage() {
         <section style={styles.subbar}>
           <button className="mc-library-button" style={{ ...styles.chip, ...(platformFilter === "" ? styles.chipActive : {}) }} onClick={() => setPlatformFilter("")}>全部</button>
           <button className="mc-library-button" style={{ ...styles.chip, ...(platformFilter === "xiaohongshu" ? styles.chipXhsActive : {}) }} onClick={() => selectPlatform("xiaohongshu")}>小红书</button>
-          <button className="mc-library-button" style={{ ...styles.chip, ...(platformFilter === "douyin" ? styles.chipDouyinActive : {}) }} onClick={() => selectPlatform("douyin")}>抖音</button>
           <button className="mc-library-button" style={{ ...styles.chip, ...(typeFilter === "image" ? styles.chipActive : {}) }} onClick={() => setTypeFilter((current) => (current === "image" ? "" : "image"))}>
             <Icon name="image" size={13} />
             图片
@@ -1064,7 +1056,7 @@ function LibraryPage() {
                 </svg>
               </div>
               <div style={styles.emptyTitle}>还没有采集的素材</div>
-              <div style={styles.emptySub}>打开小红书或抖音,点开任意一篇笔记,采集后回到这里查看</div>
+              <div style={styles.emptySub}>打开小红书,点开任意一篇笔记,采集后回到这里查看</div>
             </div>
           ) : sortedItems.length === 0 ? (
             // M5 Task 3:有素材但筛选无结果 — 小型空状态 + 一键清空
