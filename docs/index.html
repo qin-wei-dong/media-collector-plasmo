@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>素材采集助手 - 隐私说明</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #ffffff;
+        --text: #1d1d1f;
+        --muted: #5b5b66;
+        --line: #e6e6eb;
+        --blue: #0a84ff;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 48px 20px 72px;
+      }
+      h1 {
+        font-size: 34px;
+        line-height: 1.15;
+        margin: 0 0 12px;
+      }
+      .lead {
+        color: var(--muted);
+        margin: 0 0 28px;
+      }
+      section {
+        border-top: 1px solid var(--line);
+        padding-top: 20px;
+        margin-top: 24px;
+      }
+      h2 {
+        font-size: 20px;
+        margin: 0 0 10px;
+      }
+      ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+      code {
+        background: #f5f5f7;
+        padding: 0 6px;
+        border-radius: 6px;
+      }
+      a {
+        color: var(--blue);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>隐私说明</h1>
+      <p class="lead">素材采集助手重视用户隐私。当前发布版以本地使用为主，不要求注册或登录。</p>
+
+      <section>
+        <h2>数据存储</h2>
+        <ul>
+          <li>已采集素材的 URL、标题、来源页面、作者、类型、采集时间等索引信息。</li>
+          <li>收藏夹名称、颜色、排序和素材归属关系。</li>
+          <li>导出历史、导出结果和失败项重试所需的最小信息。</li>
+          <li>主题偏好等界面设置。</li>
+        </ul>
+        <p>这些数据保存在 <code>chrome.storage.local</code> 中。</p>
+      </section>
+
+      <section>
+        <h2>数据传输</h2>
+        <p>扩展不会将你的素材列表、收藏夹或导出历史上传到我们的服务器。当前版本没有账号系统、云同步或远程数据库。</p>
+        <p>当你主动导出素材时，扩展会请求对应素材 URL，并通过 Chrome 下载能力保存到本地下载目录。</p>
+      </section>
+
+      <section>
+        <h2>权限用途</h2>
+        <ul>
+          <li><code>storage</code>：保存本地素材索引和用户设置。</li>
+          <li><code>downloads</code>：保存用户主动导出的素材文件。</li>
+          <li><code>scripting</code>：在小红书页面注入采集按钮。</li>
+          <li><code>activeTab</code> / <code>tabs</code>：与当前标签页交互，并打开素材库页面。</li>
+          <li><code>notifications</code>：展示采集和导出结果。</li>
+          <li><code>contextMenus</code>：提供右键采集入口。</li>
+          <li><code>https://www.xiaohongshu.com/*</code>：在小红书页面识别当前笔记素材。</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>付费信息</h2>
+        <p>当前版本不接入支付系统，不收集支付信息。</p>
+      </section>
+
+      <section>
+        <h2>联系与反馈</h2>
+        <p>如需反馈问题或请求删除本地数据，请在扩展中清空素材库，或通过 Chrome 扩展管理页移除扩展。</p>
+      </section>
+    </main>
+  </body>
+</html>
