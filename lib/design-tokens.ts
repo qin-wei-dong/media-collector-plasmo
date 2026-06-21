@@ -29,8 +29,6 @@ export interface ThemeTokens {
   // ===== 平台品牌色 =====
   xhs: string
   xhsBg: string
-  douyin: string
-  douyinBg: string
 
   // ===== 圆角(5 档) =====
   r: { xs: number; sm: number; md: number; lg: number; pill: number }
@@ -97,8 +95,6 @@ export const darkTheme: ThemeTokens = {
 
   xhs: "#FF2442",
   xhsBg: "rgba(255,36,66,0.16)",
-  douyin: "#25F4EE",
-  douyinBg: "rgba(37,244,238,0.16)",
 
   r: { xs: 5, sm: 8, md: 11, lg: 18, pill: 9999 },
   sp: { xxs: 4, xs: 8, sm: 12, md: 17, lg: 24, xl: 32, xxl: 48 },
@@ -156,8 +152,6 @@ export const lightTheme: ThemeTokens = {
 
   xhs: "#FF2442",
   xhsBg: "rgba(255,36,66,0.10)",
-  douyin: "#0FB8B0", // light 模式 cyan 调暗一些,在白底上够对比
-  douyinBg: "rgba(15,184,176,0.10)",
 
   r: { xs: 5, sm: 8, md: 11, lg: 18, pill: 9999 },
   sp: { xxs: 4, xs: 8, sm: 12, md: 17, lg: 24, xl: 32, xxl: 48 },

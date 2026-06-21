@@ -16,37 +16,16 @@ import {
 } from "./collections"
 import { batchDownload } from "./download"
 import { stateInjector } from "../lib/xhs-state-inject"
+import { showNote } from "./notifications"
 
 /** COLLECT_MEDIA 入参 */
 type CollectPayload = MessagePayloads["COLLECT_MEDIA"]
 /** COLLECT_NOTE_IMAGES 入参 */
 type CollectNotePayload = MessagePayloads["COLLECT_NOTE_IMAGES"]
 
-// ====== 工具函数（模块内共享） ======
-// 从 manifest 动态获取扩展图标，避免硬编码 hash
-function getIconUrl(): string {
-  const icons = chrome.runtime.getManifest().icons as Record<string, string> | undefined
-  if (!icons) return ""
-  const key = icons["48"] ? "48" : Object.keys(icons)[0]
-  return chrome.runtime.getURL(icons[key])
-}
-
-export function showNote(title: string, msg: string) {
-  chrome.notifications.create(
-    {
-      type: "basic",
-      iconUrl: getIconUrl(),
-      title,
-      message: msg,
-    },
-    () => void chrome.runtime.lastError
-  )
-}
-
 function getPlatform(url?: string): string {
   if (!url) return "unknown"
   if (url.includes("xiaohongshu.com")) return "xiaohongshu"
-  if (url.includes("douyin.com")) return "douyin"
   return "unknown"
 }
 
@@ -151,7 +130,10 @@ chrome.runtime.onMessage.addListener((message: { type: MessageType; payload?: an
       }))
       saveItems(newItems).then((result) => {
         if (result.success) {
-          showNote("✅ 笔记采集完成", `已采集 ${images.length} 张图片`)
+          const suffix = result.skipped > 0 ? `，${result.skipped} 张已存在` : ""
+          showNote("✅ 笔记采集完成", `新增 ${result.added} 张图片${suffix}`)
+        } else if (result.error === "已存在") {
+          showNote("已存在", "该笔记素材已在素材库中")
         }
         sendResponse(result)
       }).catch((err) => {
@@ -354,7 +336,7 @@ function collectAndNotify(
     id: generateId(),
     url: mediaData.url,
     type: (mediaData.type || "image") as "image" | "video",
-    platform: (mediaData.platform || "unknown") as "xiaohongshu" | "douyin" | "unknown",
+    platform: (mediaData.platform || "unknown") as "xiaohongshu" | "unknown",
     title: (mediaData.title || "").slice(0, 200),
     sourceUrl: mediaData.sourceUrl || "",
     collectedAt: new Date().toISOString(),

@@ -1,7 +1,7 @@
 // types.ts — 素材采集助手共享类型定义
 
 export type MediaType = "image" | "video"
-export type Platform = "xiaohongshu" | "douyin" | "unknown"
+export type Platform = "xiaohongshu" | "unknown"
 
 export interface Collection {
   id: string
@@ -121,6 +121,8 @@ export interface MessageResponse {
   item?: MediaItem
   downloadId?: number
   count?: number
+  added?: number
+  skipped?: number
   errors?: string[]
   folder?: string
   folders?: string[]
@@ -164,6 +166,5 @@ export const MEDIA_COLLECTOR_DIR = "media-collector"
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   xiaohongshu: "小红书",
-  douyin: "抖音",
   unknown: "未知",
 }

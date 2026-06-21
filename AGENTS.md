@@ -47,7 +47,7 @@ Token 分组（`lib/design-tokens.ts`）：
 | `btn` | 按钮尺寸 | xs(22) / sm(30) / md(38) / lg(40) |
 | `fs` | 字号 | micro(11) → display(26) |
 | `accent` | Action Blue `#0a84ff` | 选中态 / focus / 品牌强调（dark/light 同色） |
-| `xhs` / `douyin` | 平台品牌色 | 平台 chip / 历史数据标识 |
+| `xhs` | 小红书品牌色 | 平台 chip / 历史数据标识 |
 | `ambient` | 顶部 radial 渐变 | 浮层/玻璃视觉协调 |
 | `shadowCard` / `shadowFloat` | 阴影 | 卡片 / 浮动操作栏 |
 | `focusRing` / `focusRingOffset` | 键盘焦点 | Apple Action Blue 2px 描边 + offset |

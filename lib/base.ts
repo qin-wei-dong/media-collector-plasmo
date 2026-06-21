@@ -353,7 +353,7 @@ export function isContextValid(): boolean {
  * 各平台 content script 共用，仅需传入平台标识和 ui 实例
  */
 export function registerContentMessageHandler(
-  platform: "xiaohongshu" | "douyin",
+  platform: "xiaohongshu" | "unknown",
   ui: HoverUIManager
 ): void {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

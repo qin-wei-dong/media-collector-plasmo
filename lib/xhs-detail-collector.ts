@@ -24,6 +24,21 @@ function getNoteIdFromUrl(): string {
   return m?.[1] || ""
 }
 
+function getRuntimeErrorMessage(): string {
+  const message = chrome.runtime?.lastError?.message || ""
+  if (message.includes("Extension context invalidated")) return "插件已更新,请刷新页面后重试"
+  if (message.includes("Receiving end does not exist")) return "插件后台未响应,请刷新页面后重试"
+  return "采集失败,请刷新页面后重试"
+}
+
+function describeCollectError(error?: string): string {
+  if (!error) return "采集失败,请稍后重试"
+  if (error === "已存在" || error.includes("已存在")) return "素材已在素材库中"
+  if (error.includes("QUOTA") || error.includes("quota")) return "本地存储空间不足,请先清理素材库"
+  if (error.includes("Extension context invalidated")) return "插件已更新,请刷新页面后重试"
+  return `采集失败:${error.slice(0, 80)}`
+}
+
 function isDetailPage(): boolean {
   return DETAIL_URL_RE.test(location.pathname)
 }
@@ -285,14 +300,14 @@ export function startDetailCollector() {
     }
     const noteId = getNoteIdFromUrl()
     if (!noteId) {
-      showToast("❌ 未识别到笔记")
+      showToast("❌ 请先点开小红书笔记详情")
       return
     }
     b.classList.add("mc_loading")
     const media = getNoteMediaFromState(noteId)
     if (!media) {
       b.classList.remove("mc_loading")
-      showToast("❌ 读取笔记数据失败,请稍后重试")
+      showToast("❌ 笔记数据还在加载,请等图片/视频出现后再试")
       return
     }
     if (media.type === "video" && media.videoUrl) {
@@ -301,7 +316,7 @@ export function startDetailCollector() {
       collectImages(media.images, noteId, media.title, media.author)
     } else {
       b.classList.remove("mc_loading")
-      showToast("❌ 未找到可采集的素材")
+      showToast("❌ 未找到图片或视频,请确认当前是笔记详情页")
     }
   }
 
@@ -331,12 +346,12 @@ export function startDetailCollector() {
       },
       (resp) => {
         btn?.classList.remove("mc_loading")
-        if (chrome.runtime.lastError || !isContextValid()) {
-          showToast("❌ 采集失败")
+        if (chrome.runtime?.lastError || !isContextValid()) {
+          showToast(`❌ ${getRuntimeErrorMessage()}`)
           return
         }
         if (resp?.success) markDone("✅ 视频已采集")
-        else showToast(resp?.error || "采集失败")
+        else showToast(`❌ ${describeCollectError(resp?.error)}`)
       }
     )
   }
@@ -361,12 +376,17 @@ export function startDetailCollector() {
       },
       (resp) => {
         btn?.classList.remove("mc_loading")
-        if (chrome.runtime.lastError || !isContextValid()) {
-          showToast("❌ 采集失败")
+        if (chrome.runtime?.lastError || !isContextValid()) {
+          showToast(`❌ ${getRuntimeErrorMessage()}`)
           return
         }
-        if (resp?.success) markDone(`✅ 已采集 ${images.length} 张图片`)
-        else showToast(resp?.error || "采集失败")
+        if (resp?.success) {
+          const added = typeof resp.added === "number" ? resp.added : images.length
+          const skipped = typeof resp.skipped === "number" ? resp.skipped : 0
+          markDone(skipped > 0 ? `✅ 新增 ${added} 张,${skipped} 张已存在` : `✅ 已采集 ${added} 张图片`)
+        } else {
+          showToast(`❌ ${describeCollectError(resp?.error)}`)
+        }
       }
     )
   }
