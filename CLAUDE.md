@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Chrome extension (Manifest V3) built with Plasmo. Collects images/videos from Xiaohongshu (小红书) and Douyin (抖音). All user-facing UI text is Simplified Chinese.
+Chrome extension (Manifest V3) built with Plasmo. Collects images/videos from Xiaohongshu (小红书). All user-facing UI text is Simplified Chinese.
 
 ## Development Commands
 
@@ -25,23 +25,23 @@ Publishing is **manual**, via the `Submit to Web Store` GitHub Action (`.github/
 Three-layer Chrome extension:
 
 ```
-Content Scripts (contents/)  ←→  Background Service Worker (background/)  ←→  Popup UI (popup.tsx + components/)
+Content Scripts (contents/)  ←→  Background Service Worker (background/)  ←→  Library UI (tabs/library.tsx + components/)
 ```
 
-- **Content scripts** (`contents/`) inject into target sites. `xiaohongshu.ts` runs the detail-page collector (injects a 「采集素材」 button into the note modal); `douyin.ts` uses hover detection. Each exports a `PlasmoCSConfig`.
+- **Content scripts** (`contents/`) inject into target sites. `xiaohongshu.ts` runs the detail-page collector (injects a 「采集素材」 button into the note modal). Each exports a `PlasmoCSConfig`.
 - **Background** (`background/index.ts`) is the message router. It owns `chrome.storage` CRUD, download orchestration, context menus, keyboard shortcuts (`Ctrl/Cmd+Shift+S`), and — critically — **injects the MAIN-world state interceptor into XHS pages** via `chrome.scripting.executeScript`.
-- **Popup** (`popup.tsx`) is a React UI (Apple Music-style immersive dark theme) showing collected items grouped by time bucket with an author carousel, hero card, and preview modal.
+- **Library UI** (`tabs/library.tsx`) is the current React UI for the release build. It is the full-screen workbench for browsing, filtering, previewing, exporting, and managing collected items.
 
 ## Message flow
 
 ```
 Content script → background: COLLECT_MEDIA / COLLECT_NOTE_IMAGES / INJECT_MAIN_WORLD
-Background → chrome.storage.local → Popup (GET_ITEMS reads back)
-Popup → background: GET_ITEMS / BATCH_DOWNLOAD / REMOVE_ITEMS / RESTORE_ITEMS / CLEAR_ITEMS
+Background → chrome.storage.local → Library UI (GET_ITEMS reads back)
+Library UI → background: GET_ITEMS / BATCH_DOWNLOAD / REMOVE_ITEMS / RESTORE_ITEMS / CLEAR_ITEMS
 Background → content script: GET_LAST_MEDIA (keyboard shortcut queries last hovered media)
 ```
 
-`RESTORE_ITEMS` is the **delete-undo channel**: popup backs up the items it just asked to delete, shows a `Toast`, and on undo sends `RESTORE_ITEMS` with the original `MediaItem[]`. The background calls `restoreItems()` (`background/storage.ts`) which merges by id (newest first), preserving the original `id` / `collectedAt` so undo restores the exact ordering.
+`RESTORE_ITEMS` is the **delete-undo channel**: the library backs up the items it just asked to delete, shows a `Toast`, and on undo sends `RESTORE_ITEMS` with the original `MediaItem[]`. The background calls `restoreItems()` (`background/storage.ts`) which merges by id (newest first), preserving the original `id` / `collectedAt` so undo restores the exact ordering.
 
 Message types are a string union in `MessageType` (`types.ts`); per-message payload shapes are in `MessagePayloads`. When adding a new message type, update **both** `MessageType` and `MessagePayloads`, and the background `switch` handler narrows the payload with `as MessagePayloads["YOUR_TYPE"]`.
 
@@ -75,9 +75,9 @@ The standalone detail-page case (direct note URL, no modal container) is handled
 
 **Do not reintroduce list-page hover collection** — list-page waterfall cards only carry cover images and lack video metadata; prior list-page attempts (hover + DOM guessing + API prefetch) were fragile and blocked by XHS anti-scraping. This is intentional, not a gap.
 
-## Popup UI (Apple Music style)
+## Library UI
 
-The popup was fully redesigned. It is **not** the old `AuthorGroup → NoteGroup → MediaCard` three-level folding list.
+The library UI is the release surface. It is **not** the old `AuthorGroup → NoteGroup → MediaCard` three-level folding list.
 
 ### Theme tokens (`lib/design-tokens.ts` + `lib/use-theme.tsx`) — **single source of truth**
 
@@ -106,9 +106,7 @@ Plus helpers: `getTimeBucket(collectedAt)` + `TIME_ORDER` for time bucketing (�
 
 主题切换由 `lib/use-theme.tsx` 的 `ThemeProvider` 持有(支持 `auto` / `dark` / `light` 三态),用户选择持久化到 `chrome.storage.local[theme_mode]`,`auto` 模式下通过 `matchMedia("(prefers-color-scheme: dark)")` 跟随系统。
 
-`popup.html` sets the 460px-wide, rounded, transparent, scrollbar-hidden popup shell.
-
-### Component composition (`popup.tsx`)
+### Component composition (`tabs/library.tsx`)
 
 Layout from top to bottom (the old `AuthorGroup → NoteGroup → MediaCard` is **gone**):
 
@@ -116,19 +114,14 @@ Layout from top to bottom (the old `AuthorGroup → NoteGroup → MediaCard` is 
 顶栏(品牌 logo + 大标题"素材" + 数量角标 + 搜索按钮)
   → [searchOpen?] 搜索框
   → [not searchOpen] 筛选行
-      ├─ 平台 chip(全部 / 小红书 / 抖音,激活态用平台品牌色)
+      ├─ 平台 chip(全部 / 小红书,激活态用平台品牌色)
       ├─ 分隔线
       └─ 类型 segmented control(图标按钮:📷 图片 / 🎬 视频,单选切换)
-  → [authorFilter?] 作者筛选指示 chip
-  → Hero(最新带封面素材,16:9 + maxHeight 180,右上角 下载/原帖 快速操作)
-  → 滚动区
-      ├─ AuthorCarousel(圆形头像,渐变占位 + coverUrl 淡入,点击筛选)
-      └─ 时间分节网格(每桶内按 collectedAt 倒序,MediaCard 1:1)
-  → FloatBar(浮动玻璃操作栏:全选 / 批量下载 / 删除)
-  → [undoToastVisible] Toast(底部 snackbar,5 秒可撤销)
-  → [downloadError] Toast(底部 snackbar,4 秒自动消失)
-  → [previewItem] PreviewModal(全屏大图,左右切换 + 原帖链接)
-  → [items.length === 0] EmptyState(三步图示 + 快捷键提示)
+  → 数据看板
+  → 收藏夹 / 平台侧栏
+  → 时间分节网格 / 列表
+  → FloatBar(浮动玻璃操作栏:全选 / 批量导出 / 删除)
+  → Toast / PreviewModal / CollectionDialog / ExportHistoryModal
 ```
 
 ### Interactions
@@ -142,7 +135,7 @@ Layout from top to bottom (the old `AuthorGroup → NoteGroup → MediaCard` is 
   - `/` (outside input) — open search
   - `Esc` — close search; falls through to PreviewModal's own Esc handler for the preview overlay
 - **Search activation collapses the filter row** (search focuses the user on results; the filter chips hide until search is closed).
-- **Platform chips are color-coded**: 小红书 → `#FF2442` background tint + red text; 抖音 → `#25F4EE` cyan tint + cyan text. "全部" uses the Apple Blue accent.
+- **Platform chips are color-coded**: 小红书 → `#FF2442` background tint + red text. "全部" uses the Apple Blue accent.
 
 ### Accessibility
 
@@ -163,7 +156,7 @@ All data aggregation lives in `popup.tsx` `useMemo`s: `heroItem`, `authors` (cou
 - `contents/*.ts` auto-registers as content scripts.
 - `lib/base.ts` is in `lib/` (not `contents/`) — this prevents it being injected on every URL. Any helper shared between content scripts must live in `lib/`, never `contents/`.
 - `background/index.ts` is the service worker.
-- `popup.tsx` at root is the popup entry.
+- `tabs/library.tsx` is the library entry.
 - Path alias `~` maps to project root.
 
 **Inline styles only:** All React components use `React.CSSProperties` objects. Content-script UI uses injected `<style>` tags. No CSS modules, no Tailwind. `tailwind.config.js` and `style.css` are leftover scaffold artifacts — leave them alone.
@@ -185,7 +178,7 @@ Strict mode, ESNext target, bundler module resolution. `types.ts` holds the shar
 ## Debugging
 
 - Dev server `pnpm dev` rebuilds on file change. Reload the extension in `chrome://extensions` to pick up new content script bundles (auto-reload does NOT happen for content scripts).
-- Content script console: the XHS/Douyin page's DevTools console.
+- Content script console: the XHS page's DevTools console.
 - Background (service worker) console: open `chrome://extensions` → your extension → "Service worker" link.
 - The MAIN-world interceptor (`stateInjector`) logs into the **page** console (not the extension's), since it runs in the page context.
 - The dev bundle lives in `build/chrome-mv3-dev/`. Hash-suffixed JS filenames change between rebuilds — to force a fresh load, "Remove" the extension and re-load the unpacked folder.
@@ -196,7 +189,7 @@ Strict mode, ESNext target, bundler module resolution. `types.ts` holds the shar
 - **`README.md`** — user/developer-facing overview and the file tree.
 - **`DESIGN.md` / `LESSONS.md`** — design rationale and the running log of lessons learned (why things are the way they are).
 
-All three describe the same current architecture: MAIN-world `executeScript` injection, the Apple Music-style popup, and the background-service-worker download path. When you change architecture, update all three — they drifted out of sync once before (a deleted `xiaohongshu-state.ts`, the old `AuthorGroup → NoteGroup → MediaCard` popup, `document_idle`) and it caused confusion.
+All three describe the same current architecture: MAIN-world `executeScript` injection, the library UI, and the background-service-worker download path. When you change architecture, update all three — they drifted out of sync once before (a deleted `xiaohongshu-state.ts`, the old `AuthorGroup → NoteGroup → MediaCard` UI, `document_idle`) and it caused confusion.
 
 ## Verification commands (M5+)
 

@@ -890,16 +890,6 @@ function LibraryPage() {
           />
         </SidebarGroup>
 
-        <div style={styles.sidebarFoot}>
-          <div style={styles.proCard}>
-            <div style={styles.proTitle}>
-              <Icon name="plus" size={13} />
-              升级 Pro
-            </div>
-            <div style={styles.proDesc}>解锁无限收藏夹、批量分文件夹导出、云端同步</div>
-            <button className="mc-library-button" style={styles.proButton}>立即升级</button>
-          </div>
-        </div>
       </aside>
 
       <main style={styles.main}>
@@ -2096,41 +2086,6 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
       height: 9,
       borderRadius: theme.r.pill,
       flexShrink: 0,
-    },
-    sidebarFoot: {
-      marginTop: "auto",
-      paddingTop: 14,
-      borderTop: `1px solid ${theme.hairlineSoft}`,
-    },
-    proCard: {
-      background: "linear-gradient(135deg, rgba(10,132,255,0.18), rgba(120,80,255,0.14))",
-      border: "1px solid rgba(10,132,255,0.25)",
-      borderRadius: theme.r.md,
-      padding: 12,
-    },
-    proTitle: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      fontSize: 13,
-      fontWeight: 700,
-    },
-    proDesc: {
-      fontSize: 11,
-      color: "rgba(255,255,255,0.68)",
-      lineHeight: 1.4,
-      margin: "5px 0 9px",
-    },
-    proButton: {
-      width: "100%",
-      border: "none",
-      background: theme.accent,
-      color: "#fff",
-      fontWeight: 600,
-      fontSize: 12,
-      padding: 7,
-      borderRadius: theme.r.sm,
-      cursor: "pointer",
     },
     main: {
       flex: 1,
