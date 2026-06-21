@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **发布收口(M7)**:公开定位收敛为“小红书素材采集与本地管理工具”;抖音采集暂不作为当前发布承诺,后续根据用户反馈评估。
 - **权限最小化(M7)**:发布版移除 Douyin host permission 和 Douyin content script,降低 Chrome Web Store 审核解释成本。
 - **文档一致性(M7)**:README / AGENTS / 商店文案 / 隐私说明同步当前 action 点击直达全屏素材库的架构。
+- **运行态平台收敛**:类型、主题 token、素材库筛选、测试样本统一收敛为小红书/未知来源,避免当前发布版 UI 暗示多平台支持。
 
 ## [2.1.0] - 2026-06-17
 

@@ -15,9 +15,7 @@ const isJson = process.argv.includes("--json")
 
 // 真实感的作者名和标题模板
 const XHS_AUTHORS = ["老王摄影", "美食日记", "设计灵感库", "旅行手记", "日常穿搭", "家居美学", "咖啡探店"]
-const DY_AUTHORS = ["搞笑日常", "知识科普", "影视剪辑", "音乐现场", "萌宠乐园", "健身教练"]
 const XHS_TITLES = ["城市夜景扫街", "周末brunch", "极简海报设计", "秋日穿搭分享", "租房改造记录", "手冲咖啡教程", "日落延时摄影", "街头人文抓拍", "插画风头像合集", "咖啡店空间设计"]
-const DY_TITLES = ["三分钟搞懂经济学", "猫咪搞笑瞬间", "电影经典片段混剪", "指弹吉他翻弹", "在家练出马甲线", "冷知识大挑战", "深夜食堂复刻"]
 
 const COLLECTION_COLORS = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F"]
 const COLLECTION_NAMES = ["灵感", "参考素材", "待整理", "精选", "项目A"]
@@ -82,10 +80,9 @@ let noteIdx = 0
 
 for (let i = 0; i < count; i++) {
   const isVideo = Math.random() < 0.25 // 25% 视频
-  const isXhs = Math.random() < 0.65 // 65% 小红书
-  const platform = isXhs ? "xiaohongshu" : "douyin"
-  const author = isXhs ? randPick(XHS_AUTHORS) : randPick(DY_AUTHORS)
-  const title = isXhs ? randPick(XHS_TITLES) : randPick(DY_TITLES)
+  const platform = "xiaohongshu"
+  const author = randPick(XHS_AUTHORS)
+  const title = randPick(XHS_TITLES)
   const seed = `${i}_${randHex24().slice(0, 6)}`
 
   // 图集:每 4 条取一个 noteId,连续 groupIndex
@@ -117,7 +114,7 @@ for (let i = 0; i < count; i++) {
     type: isVideo ? "video" : "image",
     platform,
     title: `${title}${noteId !== undefined ? ` ${groupIndex + 1}` : ""}`,
-    sourceUrl: isXhs ? `https://www.xiaohongshu.com/explore/${noteId || randHex24()}` : `https://www.douyin.com/video/${randHex24()}`,
+    sourceUrl: `https://www.xiaohongshu.com/explore/${noteId || randHex24()}`,
     collectedAt: randTimestamp(),
     coverUrl: imgUrl(seed),
     author,
@@ -148,7 +145,6 @@ console.error(`生成完成: ${items.length} 条素材`)
 console.error(`  图片: ${items.filter((i) => i.type === "image").length}`)
 console.error(`  视频: ${items.filter((i) => i.type === "video").length}`)
 console.error(`  小红书: ${items.filter((i) => i.platform === "xiaohongshu").length}`)
-console.error(`  抖音: ${items.filter((i) => i.platform === "douyin").length}`)
 console.error(`  图集(有 noteId): ${items.filter((i) => i.noteId).length}`)
 console.error(`  收藏夹: ${collections.length} 个`)
 console.error(`  已导出: ${items.filter((i) => i.exportedAt).length}`)

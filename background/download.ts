@@ -1,7 +1,7 @@
 // background/download.ts — 下载操作
 
 import { type ExportHistoryEntry, MEDIA_COLLECTOR_DIR, type Platform } from "../types"
-import { showNote } from "./index"
+import { showNote } from "./notifications"
 import { appendExportHistory, markItemsExported } from "./storage"
 
 /** 单个下载文件描述。filename 是相对路径,可含子目录,如 `618选题/标题_01.jpg`。 */
@@ -22,9 +22,9 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   })
 }
 
-/** 按平台生成防盗链 Referer(默认小红书)。 */
-function refererFor(platform?: Platform): string {
-  return platform === "douyin" ? "https://www.douyin.com/" : "https://www.xiaohongshu.com/"
+/** 当前公开版只支持小红书素材导出,统一使用小红书 Referer。 */
+function refererFor(_platform?: Platform): string {
+  return "https://www.xiaohongshu.com/"
 }
 
 /** 从 `folder/name.ext` 提取 folder 段;无目录返回空串。 */
@@ -45,11 +45,11 @@ function isUnsafePath(filename: string): boolean {
 
 /**
  * 在 background(service worker)中直接 fetch + download。
- * service worker 的 fetch 不带页面 cookie,但小红书/抖音的 CDN 图片通常不严格校验 cookie,
+ * service worker 的 fetch 不带页面 cookie,但小红书 CDN 图片通常不严格校验 cookie,
  * 只需带上 Referer 即可通过防盗链。
  *
  * M4 改造:
- * - 每个文件按自身 platform 计算 Referer(修复原先统一取第一项 platform 的问题)
+ * - 当前公开版统一使用小红书 Referer
  * - filename 可含子目录,最终路径为 `MEDIA_COLLECTOR_DIR/<filename>`
  * - 成功项记录 id 与 folder,下载完成后批量写入 exportedAt
  */

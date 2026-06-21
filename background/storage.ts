@@ -43,19 +43,24 @@ export function saveItem(item: MediaItem): Promise<{ success: boolean; error?: s
   )
 }
 
-export function saveItems(newItems: MediaItem[]): Promise<{ success: boolean }> {
+export function saveItems(newItems: MediaItem[]): Promise<{ success: boolean; added: number; skipped: number; error?: string }> {
   return enqueueWrite(() =>
     new Promise((resolve, reject) => {
       getItems().then((items) => {
         const existingUrls = new Set(items.map((i) => i.url))
         const toAdd = newItems.filter((item) => !existingUrls.has(item.url))
+        const skipped = newItems.length - toAdd.length
+        if (toAdd.length === 0) {
+          resolve({ success: false, added: 0, skipped, error: "已存在" })
+          return
+        }
         const merged = [...toAdd, ...items]
         chrome.storage.local.set({ [STORAGE_KEY]: merged }, () => {
           if (chrome.runtime.lastError) {
             reject(new Error(chrome.runtime.lastError.message))
             return
           }
-          resolve({ success: true })
+          resolve({ success: true, added: toAdd.length, skipped })
         })
       }).catch(reject)
     })

@@ -433,7 +433,6 @@ function LibraryPage() {
       recent: enrichedItems.filter((item) => item._timeBucket === "今天").length,
       uncategorized: enrichedItems.filter((item) => !item.collectionIds?.length).length,
       xhs: enrichedItems.filter((item) => item.platform === "xiaohongshu").length,
-      douyin: enrichedItems.filter((item) => item.platform === "douyin").length,
     }
   }, [enrichedItems])
 
@@ -1360,7 +1359,7 @@ const LibraryCell = memo(function LibraryCell({
   const showCoverImage = cover && !imgError
   const showVideoFrame = isVideo && !cover && !imgError
   const showMultiBadge = !isVideo && imageCount && imageCount > 1
-  const platformColor = item.platform === "xiaohongshu" ? theme.xhs : item.platform === "douyin" ? theme.douyin : theme.textTertiary
+  const platformColor = item.platform === "xiaohongshu" ? theme.xhs : theme.textTertiary
 
   return (
     <div
@@ -1602,7 +1601,6 @@ function CollectionDialog({
     "#FFD60A",
     "#AF52DE",
     theme.xhs,
-    theme.douyin,
   ]
   const [name, setName] = useState(dialog.type === "rename" ? dialog.collection.name : "")
   const [color, setColor] = useState(dialog.type === "rename" ? dialog.collection.color : colorOptions[0])
@@ -2403,10 +2401,6 @@ const makeStyles = (theme: ThemeTokens): Record<string, React.CSSProperties> => 
     chipXhsActive: {
       color: "#fff",
       background: theme.xhs,
-    },
-    chipDouyinActive: {
-      color: "#062a29",
-      background: theme.douyin,
     },
     bulkRight: {
       marginLeft: "auto",
