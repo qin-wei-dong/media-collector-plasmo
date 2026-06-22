@@ -10,8 +10,10 @@
 ## Manifest
 
 - [ ] `host_permissions` only includes `https://www.xiaohongshu.com/*`.
+- [ ] `permissions` does not include `activeTab`.
 - [ ] No Douyin content script exists in the production build.
 - [ ] Extension action click opens or focuses `tabs/library.html`.
+- [ ] Right-click menu is limited to Xiaohongshu pages.
 
 ## Chrome Manual Validation
 
@@ -34,6 +36,7 @@
 - [ ] Delete selected items.
 - [ ] Undo deletion from Toast.
 - [ ] Batch export selected items.
+- [ ] Confirm export completion keeps system notification and library Toast.
 - [ ] Open export history.
 - [ ] Retry failed export item if any failure is available.
 - [ ] Load 500 sample items and confirm the library does not white-screen.

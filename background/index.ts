@@ -23,10 +23,16 @@ type CollectPayload = MessagePayloads["COLLECT_MEDIA"]
 /** COLLECT_NOTE_IMAGES 入参 */
 type CollectNotePayload = MessagePayloads["COLLECT_NOTE_IMAGES"]
 
-function getPlatform(url?: string): string {
-  if (!url) return "unknown"
-  if (url.includes("xiaohongshu.com")) return "xiaohongshu"
-  return "unknown"
+const XHS_CONTEXT_MENU_PATTERN = "https://www.xiaohongshu.com/*"
+
+function isXiaohongshuPage(url?: string): boolean {
+  if (!url) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === "https:" && parsed.hostname === "www.xiaohongshu.com"
+  } catch {
+    return false
+  }
 }
 
 function generateId(): string {
@@ -50,6 +56,7 @@ chrome.runtime.onInstalled.addListener(() => {
     id: "collect_media",
     title: "📥 采集此素材",
     contexts: ["image", "video"],
+    documentUrlPatterns: [XHS_CONTEXT_MENU_PATTERN],
   })
 })
 
@@ -58,12 +65,18 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId !== "collect_media") return
   if (!info.srcUrl) return
 
+  const pageUrl = info.pageUrl || tab?.url || ""
+  if (!isXiaohongshuPage(pageUrl)) {
+    showNote("仅支持小红书页面", "请在小红书页面右键采集素材")
+    return
+  }
+
   collectAndNotify({
     url: info.srcUrl,
     type: info.mediaType === "video" ? "video" : "image",
-    platform: getPlatform(tab?.url),
+    platform: "xiaohongshu",
     title: tab?.title || "",
-    sourceUrl: tab?.url || "",
+    sourceUrl: pageUrl,
   })
 })
 

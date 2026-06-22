@@ -252,10 +252,15 @@ function LibraryPage() {
     return `当前筛选：${parts.join(" · ")}`
   }, [search, scope, collectionFilter, platformFilter, typeFilter, collections])
 
-  const downloadItems = (targets: MediaItem[]) => {
+  const exportContextRef = useRef<ExportContext>({ collectionFilter, collections })
+  useEffect(() => {
+    exportContextRef.current = { collectionFilter, collections }
+  }, [collectionFilter, collections])
+
+  const downloadItems = useCallback((targets: MediaItem[]) => {
     if (!targets.length) return
     setBatchDownloading(true)
-    const ctx: ExportContext = { collectionFilter, collections }
+    const ctx = exportContextRef.current
     chrome.runtime.sendMessage(
       {
         type: "BATCH_DOWNLOAD",
@@ -286,15 +291,17 @@ function LibraryPage() {
           })
           clearSelection()
           loadItems()
+          loadHistory()
         } else {
           setNotice({
             kind: "error",
             message: resp?.errors?.[0] || "导出失败，请确保小红书页面可访问",
           })
+          loadHistory()
         }
       }
     )
-  }
+  }, [clearSelection, loadHistory, loadItems])
 
   const removeSelected = () => {
     const backup = selectedItems.map(({ _selected, ...item }) => item)
@@ -328,10 +335,11 @@ function LibraryPage() {
 
   // M6 Task 3:稳定 callback(给 LibraryCell / LibraryRow 用),让 React.memo 真正生效
   // 4 个 callback 接受 item 参数,内部直接调用原函数,引用稳定 → 父级 re-render 时子组件不重渲染
-  // 依赖 [] 是安全的:内部用 setSelectedIds / chrome.runtime.sendMessage / chrome.tabs.create,都是稳定 API,stale closure 无害
+  // 依赖 [] 是安全的:内部用 setSelectedIds / chrome.tabs.create 等稳定 API,stale closure 无害。
+  // 下载入口单独依赖 downloadItems,避免捕获旧收藏夹导出上下文。
   const handlePreviewItem = useCallback((item: MediaItem) => setPreviewItem(item), [])
   const handleToggleItem = useCallback((item: MediaItem) => toggleItem(item), [])
-  const handleDownloadOne = useCallback((item: MediaItem) => downloadItems([item]), [])
+  const handleDownloadOne = useCallback((item: MediaItem) => downloadItems([item]), [downloadItems])
   const handleOpenSource = useCallback((item: MediaItem) => openSource(item), [])
 
   const createCollection = (name: string, color: string) => {
@@ -860,6 +868,7 @@ function LibraryPage() {
           onUpdate={updateCollection}
           onDelete={deleteCollection}
           onAssign={assignSelectedToCollection}
+          currentCollectionId={collectionFilter}
         />
       )}
     </div>

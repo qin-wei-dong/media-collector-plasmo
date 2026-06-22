@@ -11,16 +11,17 @@
 - **图集/视频自适应**：自动从 `__INITIAL_STATE__` 识别笔记类型，图集采全部图片，视频采视频流
 
 ### 通用功能
+- **深色主题优先**:当前发布版以深色主题为主,light/auto 作为后续基础设施
 - **全屏素材库**:点击扩展图标直接打开工作台,支持左侧导航、数据看板、密集网格和列表视图
 - **时间分节展示**:素材按「今天 / 昨天 / 本周 / 更早」分节,每节内按采集时间倒序
 - **大图预览**:点击素材查看大图,同一笔记的图片可左右切换
 - **平台筛选**:按来源平台筛选素材
 - **类型筛选**:图标 segmented control(📷 图片 / 🎬 视频),单击切换
 - **批量选择 + 批量下载**(自动按笔记标题命名)
-- **分文件夹导出**:全屏素材库页按收藏夹/作者/未分类分子目录落盘(`media-collector/<folder>/`),导出后 Toast 可一键打开文件夹
+- **分文件夹导出**:全屏素材库页按收藏夹/作者/未分类分子目录落盘(`media-collector/<folder>/`),导出后 Toast 可打开下载目录并保留系统通知
 - **删除 + 撤销**:点击垃圾桶立即删除,底部 Toast「已删除 N 项」5 秒内可点撤销
 - **键盘快捷键**:`Cmd/Ctrl+K` 聚焦搜索,`Cmd/Ctrl+A` 全选,`E` 导出,`C` 加入收藏夹,`Delete`/`Backspace` 删除(走撤销),`Esc` 优先级关闭
-- **右键菜单采集**(图片/视频上右键 → "📥 采集此素材")
+- **小红书页面右键采集**(图片/视频上右键 → "📥 采集此素材")
 - **快捷键采集**(`Ctrl/Cmd+Shift+S`)
 - **反防盗链**:在后台 service worker 中 `fetch()` 携带平台 `Referer`,绕过 CDN 防盗链限制
 - **大列表性能**(`M6`):500-1000 条素材渐进渲染(160 + 120 追加),React.memo + 预计算字段(`collectedAtMs` / `timeBucket` / `searchHaystack`)
@@ -78,7 +79,7 @@ pnpm test
 media-collector-plasmo/
 ├── lib/
 │   ├── design-tokens.ts       ← 主题 token 唯一权威源(ThemeTokens 接口 + darkTheme/lightTheme + 时间分桶)
-│   ├── use-theme.tsx          ← ThemeProvider + useTheme hook(auto/dark/light 三态,持久化)
+│   ├── use-theme.tsx          ← ThemeProvider + useTheme hook(深色主题优先,light/auto 作为基础设施)
 │   ├── base.ts                ← HoverUIManager(遗留)/ 媒体检测 / Toast / 下载工具(部分遗留)
 │   ├── xhs-state-inject.ts    ← stateInjector():被 background executeScript 注入 MAIN world
 │   ├── xhs-detail-collector.ts ← 小红书浮层 DOM 检测 + 「采集素材」按钮跟随
@@ -118,7 +119,7 @@ media-collector-plasmo/
 | Phase 4 | 弹窗增强(作者分组、平台筛选、批量操作) | ✅ 完成 |
 | Phase 5 | popup UI 重设计(Apple Music 风 + Toast 撤销 + a11y + 主题 token 统一) | ✅ 完成 |
 | P3-19 | `popup-theme.ts` → `lib/design-tokens.ts`(`ThemeTokens` 接口 + 双主题) | ✅ 完成 |
-| P3-21 | light 主题 + 跟随系统 + 顶栏主题切换 UI | ✅ 完成 |
+| P3-21 | 深色主题优先的主题基础设施 | ✅ 完成 |
 | M1 | popup 紧凑密度重设计(数据看板 + 4 列网格) | ✅ 完成 |
 | M2 | 全屏素材库 `tabs/library.tsx` | ✅ 完成 |
 | M3 | 收藏夹(Collections)+ `background/collections.ts` 独立模块 | ✅ 完成 |
@@ -137,7 +138,7 @@ media-collector-plasmo/
    pnpm build        # 输出 build/chrome-mv3-prod/
    pnpm package      # 输出 build/chrome-mv3-prod.zip
    ```
-4. **手动验证**(可选但推荐):Chrome `Load unpacked` 选 `build/chrome-mv3-prod/`,跑一遍核心流程(采集 / 打开素材库 / 主题切换 / 收藏夹 / 导出 / 导出历史)
+4. **手动验证**(可选但推荐):Chrome `Load unpacked` 选 `build/chrome-mv3-prod/`,跑一遍核心流程(采集 / 打开素材库 / 收藏夹 / 导出 / 导出历史)
 5. **触发 Action**:GitHub 仓库 → Actions → "Submit to Web Store" → Run workflow
    - 依赖 `SUBMIT_KEYS` secret(Chrome Web Store API key)
    - Action 跑 `pnpm build` → `pnpm package` → `PlasmoHQ/bpp` 上传

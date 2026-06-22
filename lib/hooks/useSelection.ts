@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { MediaItem } from "../../types"
 import type { EnrichedItem } from "./useEnrichedItems"
 
@@ -45,16 +45,16 @@ export function useSelection(
   const selectedCount = selectedItems.length
   const allCurrentSelected = sortedItems.length > 0 && sortedItems.every((item) => selectedIds.has(item.id))
 
-  const toggleItem = (item: MediaItem) => {
+  const toggleItem = useCallback((item: MediaItem) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       if (next.has(item.id)) next.delete(item.id)
       else next.add(item.id)
       return next
     })
-  }
+  }, [])
 
-  const toggleSelectAll = () => {
+  const toggleSelectAll = useCallback(() => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       const ids = sortedItems.map((item) => item.id)
@@ -63,9 +63,9 @@ export function useSelection(
       else ids.forEach((id) => next.add(id))
       return next
     })
-  }
+  }, [sortedItems])
 
-  const clearSelection = () => setSelectedIds(new Set())
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
 
   return { selectedIds, selectedItems, selectedCount, allCurrentSelected, toggleItem, toggleSelectAll, clearSelection }
 }

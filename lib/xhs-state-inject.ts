@@ -169,6 +169,8 @@ export function stateInjector() {
     for (const n of notes) {
       const media = extractNoteMedia(n.raw)
       if (media) {
+        // 刷新已有 key 的插入顺序,让后续裁剪符合"最近写入"语义。
+        if (Object.prototype.hasOwnProperty.call(cache, n.id)) delete cache[n.id]
         cache[n.id] = media
         changed = true
       }

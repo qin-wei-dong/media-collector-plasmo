@@ -15,6 +15,14 @@ function read(relPath) {
 
 const pkg = JSON.parse(read("package.json"))
 assert.deepEqual(pkg.manifest.host_permissions, ["https://www.xiaohongshu.com/*"])
+assert.deepEqual(pkg.manifest.permissions, [
+  "storage",
+  "downloads",
+  "scripting",
+  "contextMenus",
+  "notifications",
+  "tabs",
+])
 
 const sampleRaw = execFileSync(
   process.execPath,
@@ -39,5 +47,31 @@ for (const relPath of runtimeFiles) {
   assert.equal(content.includes('"douyin"'), false, `${relPath} contains a runtime douyin platform literal`)
   assert.equal(content.includes("theme.douyin"), false, `${relPath} still references theme.douyin`)
 }
+
+const releaseDocs = [
+  "README.md",
+  "docs/release/chrome-web-store-listing.md",
+  "docs/release/privacy.md",
+  "docs/index.html",
+]
+for (const relPath of releaseDocs) {
+  const content = read(relPath)
+  assert.equal(content.includes("activeTab"), false, `${relPath} still mentions activeTab`)
+}
+
+const checklist = read("docs/release/release-checklist.md")
+assert.ok(checklist.includes("permissions` does not include `activeTab`"))
+
+const readme = read("README.md")
+assert.ok(readme.includes("深色主题优先"))
+assert.ok(readme.includes("打开下载目录"))
+assert.ok(readme.includes("保留系统通知"))
+assert.equal(readme.includes("主题切换"), false)
+assert.equal(readme.includes("打开文件夹"), false)
+
+const bg = read("background/index.ts")
+assert.ok(bg.includes("documentUrlPatterns: [XHS_CONTEXT_MENU_PATTERN]"))
+assert.ok(bg.includes('https://www.xiaohongshu.com/*'))
+assert.ok(bg.includes("仅支持小红书页面"))
 
 console.log("release scope checks passed")

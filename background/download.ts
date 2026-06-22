@@ -4,6 +4,8 @@ import { type ExportHistoryEntry, MEDIA_COLLECTOR_DIR, type Platform } from "../
 import { showNote } from "./notifications"
 import { appendExportHistory, markItemsExported } from "./storage"
 
+const DOWNLOAD_TIMEOUT_MESSAGE = "下载超时,请在导出历史中重试"
+
 /** 单个下载文件描述。filename 是相对路径,可含子目录,如 `618选题/标题_01.jpg`。 */
 export type DownloadFile = {
   id?: string
@@ -41,6 +43,58 @@ export function isUnsafePath(filename: string): boolean {
   if (filename.startsWith("/") || filename.startsWith("\\")) return true
   if (/^[a-zA-Z]:[\\/]/.test(filename)) return true // Windows 盘符绝对路径
   return filename.split(/[\\/]/).some((seg) => seg === "." || seg === "..")
+}
+
+export function waitForDownloadCompletion(downloadId: number, timeoutMs = 15000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const cleanup = (onChanged: (delta: chrome.downloads.DownloadDelta) => void) => {
+      if (timer) clearTimeout(timer)
+      chrome.downloads.onChanged.removeListener(onChanged)
+    }
+
+    const finish = (onChanged: (delta: chrome.downloads.DownloadDelta) => void, error?: Error) => {
+      if (settled) return
+      settled = true
+      cleanup(onChanged)
+      if (error) reject(error)
+      else resolve()
+    }
+
+    const onChanged = (delta: chrome.downloads.DownloadDelta) => {
+      if (delta.id !== downloadId) return
+      if (delta.state?.current === "complete") {
+        finish(onChanged)
+        return
+      }
+      if (delta.state?.current === "interrupted") {
+        finish(onChanged, new Error("下载中断"))
+      }
+    }
+
+    chrome.downloads.onChanged.addListener(onChanged)
+
+    timer = setTimeout(() => {
+      chrome.downloads.search({ id: downloadId }, (items) => {
+        const lastError = chrome.runtime.lastError
+        if (lastError) {
+          finish(onChanged, new Error(lastError.message || DOWNLOAD_TIMEOUT_MESSAGE))
+          return
+        }
+
+        const state = items?.[0]?.state
+        if (state === "complete") {
+          finish(onChanged)
+        } else if (state === "interrupted") {
+          finish(onChanged, new Error("下载中断"))
+        } else {
+          finish(onChanged, new Error(DOWNLOAD_TIMEOUT_MESSAGE))
+        }
+      })
+    }, timeoutMs)
+  })
 }
 
 /**
@@ -89,22 +143,11 @@ async function downloadOne(file: DownloadFile, index: number): Promise<void> {
           reject(new Error(chrome.runtime.lastError.message))
           return
         }
-        const onChanged = (delta: chrome.downloads.DownloadDelta) => {
-          if (delta.id === downloadId && delta.state?.current === "complete") {
-            chrome.downloads.onChanged.removeListener(onChanged)
-            resolve()
-          }
-          if (delta.id === downloadId && delta.state?.current === "interrupted") {
-            chrome.downloads.onChanged.removeListener(onChanged)
-            reject(new Error("下载中断"))
-          }
+        if (typeof downloadId !== "number") {
+          reject(new Error("下载启动失败"))
+          return
         }
-        chrome.downloads.onChanged.addListener(onChanged)
-        // 兜底:15s 后无论状态都 resolve(避免 onChanged 不触发卡住队列)
-        setTimeout(() => {
-          chrome.downloads.onChanged.removeListener(onChanged)
-          resolve()
-        }, 15000)
+        waitForDownloadCompletion(downloadId).then(resolve).catch(reject)
       }
     )
   })

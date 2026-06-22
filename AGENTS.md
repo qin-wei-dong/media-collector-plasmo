@@ -37,7 +37,7 @@ contents/  (page scripts)  →  background/  (service worker)  →  tabs/library
 
 ### Library UI（效率优先资产管理台）
 
-`tabs/library.tsx` 是当前发布版主 UI。旧 `popup.tsx` 弹窗已下线,不要再为当前发布版新增 popup 功能。**主题 token 唯一权威源在 `lib/design-tokens.ts`（P3-19 迁入 + `darkTheme`/`lightTheme` 双主题），由 `lib/use-theme.tsx` 的 `ThemeProvider` 提供。所有组件经 `useTheme()` hook 消费，禁止内联 hex / magic value。**
+`tabs/library.tsx` 是当前发布版主 UI。旧 `popup.tsx` 弹窗已下线,不要再为当前发布版新增 popup 功能。**主题 token 唯一权威源在 `lib/design-tokens.ts`（P3-19 迁入 + `darkTheme`/`lightTheme` 双主题），由 `lib/use-theme.tsx` 的 `ThemeProvider` 提供。当前发布版深色主题优先，light/auto 仅作为后续基础设施。所有组件经 `useTheme()` hook 消费，禁止内联 hex / magic value。**
 
 Token 分组（`lib/design-tokens.ts`）：
 
@@ -72,7 +72,7 @@ Token 分组（`lib/design-tokens.ts`）：
 
 - **删除流程**:FloatBar 点垃圾桶 → **立即删除** → 底部 Toast「已删除 N 项 撤销」(5 秒)。点击撤销通过 `RESTORE_ITEMS` 消息把原 `MediaItem[]` 写回 `chrome.storage.local`(`background/storage.ts` 的 `restoreItems()`,按 id 去重)。**不再使用**早期的"3 秒倒计时二次确认"机制。
 - **类型筛选** 是 2 图标 segmented control(📷 图片 / 🎬 视频),单选 toggle。修复了早期"全部"在平台 + 类型两组重复出现的 UX bug。
-- **主题切换**:顶栏第二个工具按钮,`auto` / `dark` / `light` 三态循环,持久化到 `chrome.storage.local[theme_mode]`,`auto` 模式跟随 `matchMedia("(prefers-color-scheme: dark)")`。
+- **主题**:当前发布版深色主题优先,不对外承诺顶栏主题切换 UI;`light/auto` 仅作为后续基础设施。
 - **键盘快捷键** (`tabs/library.tsx`):
   - `Cmd/Ctrl+K` 聚焦搜索
   - `Cmd/Ctrl+A` 全选当前筛选结果(输入态不拦截)

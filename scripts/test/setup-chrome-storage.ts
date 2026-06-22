@@ -19,7 +19,7 @@ const chromeMock = {
     },
   },
   runtime: {
-    lastError: undefined as string | undefined,
+    lastError: undefined as chrome.runtime.LastError | undefined,
   },
 }
 

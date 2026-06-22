@@ -12,6 +12,7 @@ export function CollectionDialog({
   onUpdate,
   onDelete,
   onAssign,
+  currentCollectionId,
 }: {
   dialog: Exclude<DialogState, null>
   collections: Collection[]
@@ -21,6 +22,7 @@ export function CollectionDialog({
   onUpdate: (collection: Collection, next: { name: string; color: string; pinned: boolean }) => void
   onDelete: (collection: Collection) => void
   onAssign: (collection: Collection) => void
+  currentCollectionId?: string
 }) {
   const theme = useTheme()
   const styles = useMemo(() => makeStyles(theme), [theme])
@@ -140,17 +142,27 @@ export function CollectionDialog({
             {collections.length === 0 ? (
               <div style={styles.dialogEmpty}>还没有收藏夹，先新建一个吧</div>
             ) : (
-              collections.map((collection) => (
-                <button
-                  key={collection.id}
-                  className="mc-library-button"
-                  style={styles.collectionChoice}
-                  onClick={() => onAssign(collection)}
-                >
-                  <span style={{ ...styles.dot, background: collection.color }} />
-                  <span>{collection.name}</span>
-                </button>
-              ))
+              collections.map((collection) => {
+                const isCurrent = collection.id === currentCollectionId
+                return (
+                  <button
+                    key={collection.id}
+                    className="mc-library-button"
+                    style={{
+                      ...styles.collectionChoice,
+                      ...(isCurrent ? styles.disabled : {}),
+                    }}
+                    onClick={() => {
+                      if (!isCurrent) onAssign(collection)
+                    }}
+                    disabled={isCurrent}
+                    aria-disabled={isCurrent}
+                  >
+                    <span style={{ ...styles.dot, background: collection.color }} />
+                    <span>{collection.name}{isCurrent ? "（当前）" : ""}</span>
+                  </button>
+                )
+              })
             )}
           </div>
         )}

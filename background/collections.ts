@@ -339,8 +339,9 @@ export function moveCollectionItems(
           const nextItems = items.map((item) => {
             if (!idSet.has(item.id) || !item.collectionIds?.length) return item
             if (!item.collectionIds.includes(fromCollectionId)) return item
-            const nextIds = item.collectionIds.filter((id) => id !== fromCollectionId)
-            nextIds.push(toCollectionId)
+            const nextIds = Array.from(
+              new Set([...item.collectionIds.filter((id) => id !== fromCollectionId), toCollectionId])
+            )
             movedCount += 1
             return { ...item, collectionIds: nextIds }
           })

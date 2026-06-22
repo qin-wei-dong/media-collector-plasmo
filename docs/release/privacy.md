@@ -24,9 +24,9 @@
 - `storage`: 保存本地素材索引和用户设置。
 - `downloads`: 保存用户主动导出的素材文件。
 - `scripting`: 在小红书页面注入采集按钮。
-- `activeTab` / `tabs`: 与当前标签页交互，并打开素材库页面。
-- `notifications`: 展示采集和导出结果。
-- `contextMenus`: 提供右键采集入口。
+- `tabs`: 打开素材库页面。
+- `notifications`: 展示采集和导出结果，并保留导出完成系统通知。
+- `contextMenus`: 在小红书页面提供右键采集入口。
 - `https://www.xiaohongshu.com/*`: 在小红书页面识别当前笔记素材。
 
 ## 付费信息

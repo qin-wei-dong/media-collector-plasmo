@@ -34,7 +34,6 @@
     "permissions": [
       "storage",
       "downloads",
-      "activeTab",
       "scripting",
       "contextMenus",
       "notifications",
