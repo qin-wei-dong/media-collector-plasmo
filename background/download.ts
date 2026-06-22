@@ -37,7 +37,7 @@ function extractFolder(filename: string): string {
  * 路径穿越防御(M4 plan 4.2 / 风险5):拒绝绝对路径和 `.` / `..` 目录段。
  * 按 `/ \` 拆段精确判定,不误伤名字中含 ".." 的合法文件名(如 `5..2促销.jpg`)。
  */
-function isUnsafePath(filename: string): boolean {
+export function isUnsafePath(filename: string): boolean {
   if (filename.startsWith("/") || filename.startsWith("\\")) return true
   if (/^[a-zA-Z]:[\\/]/.test(filename)) return true // Windows 盘符绝对路径
   return filename.split(/[\\/]/).some((seg) => seg === "." || seg === "..")
