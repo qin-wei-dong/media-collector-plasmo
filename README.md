@@ -59,6 +59,9 @@ pnpm build
 
 # 打包扩展（用于 Chrome Web Store 发布）
 pnpm package
+
+# 运行单元测试（vitest）
+pnpm test
 ```
 
 开发时加载 `build/chrome-mv3-dev` 目录到 Chrome。

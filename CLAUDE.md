@@ -14,7 +14,7 @@ pnpm build        # Production build
 pnpm package      # Build + zip for Chrome Web Store submission
 ```
 
-No test suite or linter. Prettier is configured (`.prettierrc.mjs`).
+No linter. vitest for unit tests (pure logic). Prettier is configured (`.prettierrc.mjs`).
 
 ## Release / publish to Chrome Web Store
 
