@@ -196,6 +196,7 @@ All three describe the same current architecture: MAIN-world `executeScript` inj
 
 ```bash
 pnpm build            # Plasmo build,必须成功
+pnpm test             # vitest 单元测试(纯逻辑)
 pnpm audit:a11y       # axe-core a11y 审计(覆盖 library harness)
 ```
 

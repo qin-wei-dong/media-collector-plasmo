@@ -8,9 +8,10 @@ Chrome extension (Manifest V3) using Plasmo. Current public release collects ima
 pnpm dev        # dev server — load build/chrome-mv3-dev in Chrome
 pnpm build      # production build
 pnpm package    # build + zip
+pnpm test       # vitest 单元测试(纯逻辑)
 ```
 
-No test suite, no linter. Prettier is set up.
+No linter. vitest for unit tests (pure logic). Prettier is set up.
 
 ## Architecture
 
