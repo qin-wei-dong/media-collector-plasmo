@@ -1,6 +1,6 @@
 # 素材采集助手
 
-**当前版本: v2.1.0**([CHANGELOG](./CHANGELOG.md)) | 小红书素材采集与本地管理
+**当前版本: v2.1.1**([CHANGELOG](./CHANGELOG.md)) | 小红书素材采集与本地管理
 
 点开小红书笔记后，一键采集图片或视频素材，并在本地素材库中统一管理、收藏和批量导出。
 
@@ -108,7 +108,7 @@ media-collector-plasmo/
 
 ## 当前开发状态
 
-> v2.1.0 完整 changelog 见 [CHANGELOG.md](./CHANGELOG.md)。下方为开发历程索引,作为变更回顾用。
+> 完整 changelog 见 [CHANGELOG.md](./CHANGELOG.md)。下方为开发历程索引,作为变更回顾用。
 
 | 阶段 | 内容 | 状态 |
 |-------|------|------|

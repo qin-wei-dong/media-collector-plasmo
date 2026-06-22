@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+暂无。
+
+## [2.1.1] - 2026-06-22
+
 ### 变更
 
 - **M8 发布后收口**:右键菜单仅在小红书页面展示,移除 `activeTab`,导出完成保留系统通知与库页 Toast,文档收口为“深色主题优先”。
