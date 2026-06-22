@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { Collection, DialogState, ExportHistoryEntry, MediaItem, MediaType, Platform } from "../types"
 import { PLATFORM_LABELS } from "../types"
-import { getTimeBucket, TIME_ORDER, type ThemeTokens } from "../lib/design-tokens"
+import { TIME_ORDER, type ThemeTokens } from "../lib/design-tokens"
 import { makeStyles } from "../lib/library-styles"
 import { ThemeProvider, useTheme } from "../lib/use-theme"
 import { PreviewModal } from "../components/PreviewModal"
@@ -14,17 +14,10 @@ import { ExportHistoryModal } from "../components/ExportHistoryModal"
 import { buildExportPath, summarizeExportFolders, type ExportContext } from "../lib/export-path"
 import { useLibraryData } from "../lib/hooks/useLibraryData"
 import { useSortedCollections } from "../lib/hooks/useSortedCollections"
+import { useEnrichedItems, type EnrichedItem } from "../lib/hooks/useEnrichedItems"
 
 type Scope = "all" | "recent" | "uncategorized"
 type ViewMode = "grid" | "list"
-
-// M6 Task 3:预计算字段 — items 一次性派生,下游 useMemo 复用,避免重复 new Date()/字符串拼
-// 内部计算字段以下划线开头,不入 storage(纯内存对象,源自 useMemo)
-type EnrichedItem = MediaItem & {
-  _collectedAtMs: number
-  _timeBucket: string
-  _searchHaystack: string
-}
 
 // M6 Task 2:渐进渲染配置
 const INITIAL_RENDER_COUNT = 160
@@ -85,6 +78,7 @@ function LibraryPage() {
 
   const { items, collections, history, failedHistoryCount, setItems, setCollections, setHistory, loadItems, loadCollections, loadHistory } = useLibraryData()
   const { sortedCollections } = useSortedCollections(collections)
+  const { enrichedItems } = useEnrichedItems(items)
   const [search, setSearch] = useState("")
   const [scope, setScope] = useState<Scope>("all")
   const [collectionFilter, setCollectionFilter] = useState("")
@@ -94,7 +88,6 @@ function LibraryPage() {
   const [sortDesc, setSortDesc] = useState(true)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
-  // loadHistory 启动时拉一次(挂在主 useEffect 内)
   const [notice, setNotice] = useState<Notice | null>(null)
   // M6 Task 4:导出历史 modal
   const [showHistory, setShowHistory] = useState(false)
@@ -213,15 +206,7 @@ function LibraryPage() {
 
   // M6 Task 3:预计算 — items 变化时一次性算出 collectedAtMs / timeBucket / searchHaystack
   // 下游 useMemo(stats / authors / filteredItems / sortedItems / buckets / visibleBuckets)复用,避免重复 new Date()
-  const enrichedItems = useMemo<EnrichedItem[]>(() => {
-    return items.map((item) => ({
-      ...item,
-      _collectedAtMs: +new Date(item.collectedAt),
-      _timeBucket: getTimeBucket(item.collectedAt),
-      _searchHaystack: `${item.title || ""} ${item.author || ""}`.toLowerCase(),
-    }))
-  }, [items])
-
+  // M6 Task 3:预计算 — items 变化时一次性算出 collectedAtMs / timeBucket / searchHaystack(已抽到 useEnrichedItems)
   const authors = useMemo(() => {
     const map = new Map<string, { name: string; count: number; first: MediaItem }>()
     // M6 Task 3:用 enrichedItems._collectedAtMs 替代 +new Date
