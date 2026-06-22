@@ -24,13 +24,13 @@ export function CollectionDialog({
 }) {
   const theme = useTheme()
   const styles = useMemo(() => makeStyles(theme), [theme])
-  const colorOptions = [
-    "#FF5A5F",
-    "#5AC8FA",
-    "#FFD60A",
-    "#AF52DE",
-    theme.xhs,
-  ]
+  // useMemo 稳定引用:colorOptions 若每次 render 新建数组,会进入下方重置表单的
+  // useEffect deps,导致每次 render 都 setName("") —— 新建收藏夹时输入名称会被
+  // 立即清空。theme.xhs 在 dark/light 都是 #FF2442,故 colorOptions 实际恒定。
+  const colorOptions = useMemo(
+    () => ["#FF5A5F", "#5AC8FA", "#FFD60A", "#AF52DE", theme.xhs],
+    [theme.xhs]
+  )
   const [name, setName] = useState(dialog.type === "rename" ? dialog.collection.name : "")
   const [color, setColor] = useState(dialog.type === "rename" ? dialog.collection.color : colorOptions[0])
   // M6 Task 5:置顶状态(仅 rename 模式有意义)
