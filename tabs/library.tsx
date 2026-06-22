@@ -673,6 +673,15 @@ function LibraryPage() {
   const handleOpenSource = useCallback((item: MediaItem) => openSource(item), [])
 
   const createCollection = (name: string, color: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) {
+      setNotice({ kind: "error", message: "收藏夹名称不能为空" })
+      return
+    }
+    if (collections.some((collection) => collection.name === trimmed)) {
+      setNotice({ kind: "error", message: "收藏夹已存在" })
+      return
+    }
     chrome.runtime.sendMessage({ type: "CREATE_COLLECTION", payload: { name, color } }, (resp) => {
       if (resp?.success) {
         setNotice({ kind: "success", message: `已创建收藏夹「${resp.collection?.name || name}」` })
@@ -686,13 +695,22 @@ function LibraryPage() {
 
   // M6 Task 5:编辑收藏夹(name + color + pinned 一起保存,3 个 message 串行写)
   const updateCollection = (collection: Collection, next: { name: string; color: string; pinned: boolean }) => {
+    const trimmed = next.name.trim()
+    if (!trimmed) {
+      setNotice({ kind: "error", message: "收藏夹名称不能为空" })
+      return
+    }
+    if (trimmed !== collection.name && collections.some((c) => c.name === trimmed)) {
+      setNotice({ kind: "error", message: "收藏夹已存在" })
+      return
+    }
     const tasks: Array<() => Promise<boolean>> = []
-    if (next.name !== collection.name) {
+    if (trimmed !== collection.name) {
       tasks.push(
         () =>
           new Promise<boolean>((resolve) => {
             chrome.runtime.sendMessage(
-              { type: "RENAME_COLLECTION", payload: { id: collection.id, name: next.name } },
+              { type: "RENAME_COLLECTION", payload: { id: collection.id, name: trimmed } },
               (resp: { success?: boolean } | undefined) => resolve(resp?.success === true)
             )
           })
@@ -1594,6 +1612,18 @@ function CollectionDialog({
   ]
   const [name, setName] = useState(dialog.type === "rename" ? dialog.collection.name : "")
   const [color, setColor] = useState(dialog.type === "rename" ? dialog.collection.color : colorOptions[0])
+  // M6 Task 5:置顶状态(仅 rename 模式有意义)
+  const [pinned, setPinned] = useState(
+    dialog.type === "rename" ? dialog.collection.pinned ?? false : false
+  )
+
+  // 对话框每次打开/切换类型时都重置内部表单状态,避免残留上一次编辑内容
+  useEffect(() => {
+    setName(dialog.type === "rename" ? dialog.collection.name : "")
+    setColor(dialog.type === "rename" ? dialog.collection.color : colorOptions[0])
+    setPinned(dialog.type === "rename" ? dialog.collection.pinned ?? false : false)
+  }, [dialog, colorOptions])
+
   // M5 Task 4:对话框打开时,Enter/Esc 快捷键 — capture 阶段拦截,避免与库页 keyboard handler 重复触发
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1625,11 +1655,6 @@ function CollectionDialog({
         : dialog.type === "delete"
           ? "删除收藏夹"
           : "加入收藏夹"
-
-  // M6 Task 5:置顶状态(仅 rename 模式有意义)
-  const [pinned, setPinned] = useState(
-    dialog.type === "rename" ? dialog.collection.pinned ?? false : false
-  )
 
   return (
     <div style={styles.dialogOverlay} onClick={onClose}>
