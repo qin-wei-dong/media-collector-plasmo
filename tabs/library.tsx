@@ -14,15 +14,11 @@ import { ExportHistoryModal } from "../components/ExportHistoryModal"
 import { buildExportPath, summarizeExportFolders, type ExportContext } from "../lib/export-path"
 import { useLibraryData } from "../lib/hooks/useLibraryData"
 import { useSortedCollections } from "../lib/hooks/useSortedCollections"
-import { useEnrichedItems, type EnrichedItem } from "../lib/hooks/useEnrichedItems"
+import { useEnrichedItems } from "../lib/hooks/useEnrichedItems"
 import { useStats } from "../lib/hooks/useStats"
+import { useFilteredItems, type Scope } from "../lib/hooks/useFilteredItems"
 
-type Scope = "all" | "recent" | "uncategorized"
 type ViewMode = "grid" | "list"
-
-// M6 Task 2:渐进渲染配置
-const INITIAL_RENDER_COUNT = 160
-const RENDER_INCREMENT = 120
 
 function injectLibraryStyles(theme: ThemeTokens) {
   const id = "__mc_library_style"
@@ -88,6 +84,11 @@ function LibraryPage() {
   const [typeFilter, setTypeFilter] = useState<MediaType | "">("")
   const [viewMode, setViewMode] = useState<ViewMode>("grid")
   const [sortDesc, setSortDesc] = useState(true)
+  const { sortedItems, buckets, visibleItems, visibleBuckets, loadMore } = useFilteredItems(
+    enrichedItems,
+    { search, scope, collectionFilter, platformFilter, typeFilter },
+    sortDesc
+  )
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null)
   const [notice, setNotice] = useState<Notice | null>(null)
@@ -95,8 +96,6 @@ function LibraryPage() {
   const [showHistory, setShowHistory] = useState(false)
   const [dialog, setDialog] = useState<DialogState>(null)
   const [batchDownloading, setBatchDownloading] = useState(false)
-  // M6 Task 2:渐进渲染——只渲染前 N 项,滚动接近底部再追加
-  const [renderLimit, setRenderLimit] = useState(INITIAL_RENDER_COUNT)
 
   useEffect(() => {
     injectLibraryStyles(theme)
@@ -205,57 +204,6 @@ function LibraryPage() {
       return next.size === prev.size ? prev : next
     })
   }, [items])
-
-  const filteredItems = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    // M6 Task 3:用 enrichedItems 复用 _timeBucket / _searchHaystack,避免每个 item 重复 getTimeBucket + 拼字符串
-    return enrichedItems.filter((item) => {
-      if (scope === "recent" && item._timeBucket !== "今天") return false
-      if (scope === "uncategorized" && item.collectionIds?.length) return false
-      if (collectionFilter && !item.collectionIds?.includes(collectionFilter)) return false
-      if (platformFilter && item.platform !== platformFilter) return false
-      if (typeFilter && item.type !== typeFilter) return false
-      if (q && !item._searchHaystack.includes(q)) return false
-      return true
-    })
-  }, [collectionFilter, enrichedItems, platformFilter, scope, search, typeFilter])
-
-  const sortedItems = useMemo(() => {
-    // M6 Task 3:用 _collectedAtMs 替代 +new Date(...)
-    return [...filteredItems].sort((a, b) => {
-      const diff = b._collectedAtMs - a._collectedAtMs
-      return sortDesc ? diff : -diff
-    })
-  }, [filteredItems, sortDesc])
-
-  const buckets = useMemo(() => {
-    // M6 Task 3:用 _timeBucket 替代 getTimeBucket(item.collectedAt)
-    const map = new Map<string, EnrichedItem[]>()
-    for (const item of sortedItems) {
-      const arr = map.get(item._timeBucket)
-      if (arr) arr.push(item)
-      else map.set(item._timeBucket, [item])
-    }
-    return map
-  }, [sortedItems])
-
-  // M6 Task 2:渐进渲染——只渲染前 renderLimit 项
-  const visibleItems = useMemo(() => sortedItems.slice(0, renderLimit), [sortedItems, renderLimit])
-  const visibleBuckets = useMemo(() => {
-    // M6 Task 3:用 _timeBucket 替代 getTimeBucket(item.collectedAt)
-    const map = new Map<string, EnrichedItem[]>()
-    for (const item of visibleItems) {
-      const arr = map.get(item._timeBucket)
-      if (arr) arr.push(item)
-      else map.set(item._timeBucket, [item])
-    }
-    return map
-  }, [visibleItems])
-
-  // 筛选/搜索/排序/视图变化时重置 renderLimit
-  useEffect(() => {
-    setRenderLimit(INITIAL_RENDER_COUNT)
-  }, [search, scope, collectionFilter, platformFilter, typeFilter, sortDesc, viewMode])
 
   const selectedItems = useMemo(() => items.filter((item) => selectedIds.has(item.id)), [items, selectedIds])
   // selectedCount 取 selectedItems.length 而非 selectedIds.size,避免 items 变化时短暂失真
@@ -800,7 +748,7 @@ function LibraryPage() {
             const el = e.currentTarget
             // 滚动接近底部时追加渲染(M6 Task 2)
             if (el.scrollTop + el.clientHeight >= el.scrollHeight - 480) {
-              setRenderLimit((n) => Math.min(n + RENDER_INCREMENT, sortedItems.length))
+              loadMore()
             }
           }}
         >
@@ -883,7 +831,7 @@ function LibraryPage() {
               <button
                 className="mc-library-button"
                 style={styles.loadMoreBtn}
-                onClick={() => setRenderLimit((n) => Math.min(n + RENDER_INCREMENT, sortedItems.length))}
+                onClick={loadMore}
               >
                 继续加载({sortedItems.length - visibleItems.length} 项)
               </button>
