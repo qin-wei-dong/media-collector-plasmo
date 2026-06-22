@@ -4,5 +4,6 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["**/*.test.ts"],
+    setupFiles: ["./scripts/test/setup-chrome-storage.ts"],
   },
 })
