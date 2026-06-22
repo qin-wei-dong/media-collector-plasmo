@@ -1,12 +1,11 @@
 import { useMemo } from "react"
-import type { Collection, MediaItem } from "../../types"
+import type { MediaItem } from "../../types"
 import type { EnrichedItem } from "./useEnrichedItems"
 
 // 批3-3:从 library.tsx 抽出的看板/侧栏聚合 5 个 useMemo(authors / stats / sidebarCounts / collectionCounts / noteImageCounts)。
 // 纯重构,逻辑逐字迁移。stats 依赖 authors(本 hook 内部)。
 export function useStats(
   items: MediaItem[],
-  collections: Collection[],
   enrichedItems: EnrichedItem[]
 ) {
   const authors = useMemo(() => {

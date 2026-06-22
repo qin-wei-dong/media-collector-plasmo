@@ -80,7 +80,7 @@ function LibraryPage() {
   const { items, collections, history, failedHistoryCount, setItems, setCollections, setHistory, loadItems, loadCollections, loadHistory } = useLibraryData()
   const { sortedCollections } = useSortedCollections(collections)
   const { enrichedItems } = useEnrichedItems(items)
-  const { authors, stats, sidebarCounts, collectionCounts, noteImageCounts } = useStats(items, collections, enrichedItems)
+  const { authors, stats, sidebarCounts, collectionCounts, noteImageCounts } = useStats(items, enrichedItems)
   const [search, setSearch] = useState("")
   const [scope, setScope] = useState<Scope>("all")
   const [collectionFilter, setCollectionFilter] = useState("")
