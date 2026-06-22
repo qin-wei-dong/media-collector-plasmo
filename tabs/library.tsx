@@ -12,6 +12,8 @@ import { LibraryRow } from "../components/LibraryRow"
 import { CollectionDialog } from "../components/CollectionDialog"
 import { ExportHistoryModal } from "../components/ExportHistoryModal"
 import { buildExportPath, summarizeExportFolders, type ExportContext } from "../lib/export-path"
+import { useLibraryData } from "../lib/hooks/useLibraryData"
+import { useSortedCollections } from "../lib/hooks/useSortedCollections"
 
 type Scope = "all" | "recent" | "uncategorized"
 type ViewMode = "grid" | "list"
@@ -81,8 +83,8 @@ function LibraryPage() {
   const styles = useMemo(() => makeStyles(theme), [theme])
   const searchRef = useRef<HTMLInputElement | null>(null)
 
-  const [items, setItems] = useState<MediaItem[]>([])
-  const [collections, setCollections] = useState<Collection[]>([])
+  const { items, collections, history, failedHistoryCount, setItems, setCollections, setHistory, loadItems, loadCollections, loadHistory } = useLibraryData()
+  const { sortedCollections } = useSortedCollections(collections)
   const [search, setSearch] = useState("")
   const [scope, setScope] = useState<Scope>("all")
   const [collectionFilter, setCollectionFilter] = useState("")
@@ -95,23 +97,7 @@ function LibraryPage() {
   // loadHistory 启动时拉一次(挂在主 useEffect 内)
   const [notice, setNotice] = useState<Notice | null>(null)
   // M6 Task 4:导出历史 modal
-  const [history, setHistory] = useState<ExportHistoryEntry[]>([])
   const [showHistory, setShowHistory] = useState(false)
-  const loadHistory = useCallback(() => {
-    try {
-      chrome.runtime.sendMessage({ type: "GET_EXPORT_HISTORY" }, (resp) => {
-        if (chrome.runtime.lastError || !resp?.success) return
-        setHistory((resp.history as ExportHistoryEntry[]) || [])
-      })
-    } catch {
-      // 防御性兜底:即使 sendMessage 抛错也不影响库页
-    }
-  }, [])
-  // 历史有失败项的总和(用于按钮角标)
-  const failedHistoryCount = useMemo(
-    () => history.reduce((sum, h) => sum + (h.failedCount || 0), 0),
-    [history]
-  )
   const [dialog, setDialog] = useState<DialogState>(null)
   const [batchDownloading, setBatchDownloading] = useState(false)
   // M6 Task 2:渐进渲染——只渲染前 N 项,滚动接近底部再追加
@@ -120,44 +106,6 @@ function LibraryPage() {
   useEffect(() => {
     injectLibraryStyles(theme)
   }, [theme])
-
-  const loadItems = useCallback(() => {
-    chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (resp) => {
-      const err = chrome.runtime.lastError
-      if (err || !resp) {
-        console.warn("[Library] GET_ITEMS 失败,重试:", err?.message)
-        setTimeout(() => {
-          chrome.runtime.sendMessage({ type: "GET_ITEMS" }, (r2) => {
-            if (r2?.items) setItems(r2.items)
-          })
-        }, 300)
-        return
-      }
-      if (resp.items) setItems(resp.items)
-    })
-  }, [])
-
-  const loadCollections = useCallback(() => {
-    chrome.runtime.sendMessage({ type: "GET_COLLECTIONS" }, (resp) => {
-      const err = chrome.runtime.lastError
-      if (err || !resp) {
-        console.warn("[Library] GET_COLLECTIONS 失败,重试:", err?.message)
-        setTimeout(() => {
-          chrome.runtime.sendMessage({ type: "GET_COLLECTIONS" }, (r2) => {
-            if (r2?.collections) setCollections(r2.collections)
-          })
-        }, 300)
-        return
-      }
-      if (resp.collections) setCollections(resp.collections)
-    })
-  }, [])
-
-  useEffect(() => {
-    loadItems()
-    loadCollections()
-    loadHistory()
-  }, [loadCollections, loadItems, loadHistory])
 
   // M5 Task 4 + M6 Task 6:库页快捷键补齐
   // 用 handlerRef 模式避免 useEffect deps 数组引用未初始化的 const(TDZ)
@@ -273,19 +221,6 @@ function LibraryPage() {
       _searchHaystack: `${item.title || ""} ${item.author || ""}`.toLowerCase(),
     }))
   }, [items])
-
-  // M6 Task 5:侧栏收藏夹排序 — pinned 在前 / sortOrder 小的在前 / sortOrder 相同时 createdAt 倒序
-  const sortedCollections = useMemo(() => {
-    return [...collections].sort((a, b) => {
-      const aPinned = a.pinned ?? false
-      const bPinned = b.pinned ?? false
-      if (aPinned !== bPinned) return aPinned ? -1 : 1
-      const aOrder = a.sortOrder ?? 0
-      const bOrder = b.sortOrder ?? 0
-      if (aOrder !== bOrder) return aOrder - bOrder
-      return +new Date(b.createdAt) - +new Date(a.createdAt)
-    })
-  }, [collections])
 
   const authors = useMemo(() => {
     const map = new Map<string, { name: string; count: number; first: MediaItem }>()
