@@ -14,6 +14,14 @@ export interface Collection {
   pinned?: boolean
 }
 
+// 收藏夹 dialog 状态 — LibraryPage + CollectionDialog 共用
+export type DialogState =
+  | { type: "create" }
+  | { type: "assign" }
+  | { type: "rename"; collection: Collection }
+  | { type: "delete"; collection: Collection }
+  | null
+
 export interface MediaItem {
   id: string
   url: string
