@@ -8,7 +8,9 @@
     "build": "plasmo build",
     "package": "plasmo package",
     "test:release-scope": "node scripts/test-release-scope.mjs",
-    "audit:a11y": "node scripts/a11y-audit.mjs"
+    "audit:a11y": "node scripts/a11y-audit.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "plasmo": "0.90.5",
@@ -21,7 +23,8 @@
     "@types/react-dom": "^18",
     "axe-core": "^4.12.1",
     "puppeteer-core": "^25.1.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.9"
   },
   "manifest": {
     "action": {},
