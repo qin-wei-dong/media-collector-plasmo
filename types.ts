@@ -45,7 +45,7 @@ export type MessageType =
   | "GET_ITEMS"
   | "CLEAR_ITEMS"
   | "BATCH_DOWNLOAD"
-  | "GET_LAST_MEDIA"
+  | "COLLECT_CURRENT_NOTE"
   | "INJECT_MAIN_WORLD"
   | "REMOVE_ITEMS"
   | "RESTORE_ITEMS"
@@ -94,7 +94,7 @@ export interface MessagePayloads {
   GET_ITEMS: void
   CLEAR_ITEMS: void
   BATCH_DOWNLOAD: Array<{ id?: string; url: string; filename: string; platform?: Platform }>
-  GET_LAST_MEDIA: void
+  COLLECT_CURRENT_NOTE: void
   REMOVE_ITEMS: string[]
   RESTORE_ITEMS: MediaItem[]
   GET_COLLECTIONS: void
@@ -131,13 +131,10 @@ export interface MessageResponse {
   collection?: Collection
   // M6 Task 4:导出历史(GET_EXPORT_HISTORY 返回)
   history?: ExportHistoryEntry[]
-  media?: {
-    url: string
-    type: MediaType
-    platform: Platform
-    title: string
-    sourceUrl: string
-  } | null
+  // COLLECT_CURRENT_NOTE:content script 是否已自主完成采集(快捷键路径),
+  // background 据此决定是否显示兜底通知
+  handled?: boolean
+  ok?: boolean
 }
 
 // M6 Task 4:导出历史条目 — 记录每次 batchDownload 的结果

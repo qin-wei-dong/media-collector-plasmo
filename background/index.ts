@@ -90,11 +90,12 @@ chrome.commands.onCommand.addListener((command) => {
     const tab = tabs[0]
     if (!tab?.id) return
 
-    chrome.tabs.sendMessage(tab.id, { type: "GET_LAST_MEDIA" }, (response) => {
-      if (response?.media) {
-        collectAndNotify(response.media)
-      } else {
-        showNote("未检测到素材", "请在小红书中点开笔记浮层后，点击「采集素材」按钮")
+    // 快捷键采集:content script(xiaohongshu.ts)收到 COLLECT_CURRENT_NOTE 后自主采集
+    // 当前浮层/详情页(发 COLLECT_* 存储 + toast 反馈)。仅当 content 未处理时
+    // (非 XHS 页 / 无浮层 / 扩展重载后页面没刷新)显示兜底提示。
+    chrome.tabs.sendMessage(tab.id, { type: "COLLECT_CURRENT_NOTE" }, (response) => {
+      if (chrome.runtime.lastError || !response?.handled) {
+        showNote("未检测到素材", "请在小红书中点开笔记浮层后，再按快捷键或点击「采集素材」按钮")
       }
     })
   })

@@ -201,6 +201,113 @@ function setBtnText(btn: HTMLButtonElement, text: string) {
   if (span) span.textContent = text
 }
 
+// ====== 采集核心(模块级,不依赖按钮 UI — 按钮点击与快捷键共用) ======
+
+export type CollectResult = { ok: true; message: string } | { ok: false; message: string }
+
+function collectVideo(media: XHSNoteMedia, noteId: string, scope: ParentNode | null): Promise<CollectResult> {
+  const mediaEl = scope ? findMediaEl(scope) : null
+  const domCoverUrl =
+    mediaEl instanceof HTMLVideoElement
+      ? normalizeCoverUrl(mediaEl.poster || "") || (scope ? findVisibleCoverImage(scope) : "")
+      : mediaEl instanceof HTMLImageElement
+        ? normalizeCoverUrl(mediaEl.currentSrc || mediaEl.src || "")
+        : ""
+
+  return new Promise<CollectResult>((resolve) => {
+    chrome.runtime.sendMessage(
+      {
+        type: "COLLECT_MEDIA",
+        payload: {
+          url: media.videoUrl,
+          type: "video",
+          platform: "xiaohongshu",
+          title: media.title,
+          sourceUrl: location.href,
+          noteId,
+          author: media.author,
+          coverUrl: media.coverUrl || domCoverUrl || undefined,
+        },
+      },
+      (resp) => {
+        if (chrome.runtime?.lastError || !isContextValid()) {
+          resolve({ ok: false, message: getRuntimeErrorMessage() })
+          return
+        }
+        if (resp?.success) resolve({ ok: true, message: "✅ 视频已采集" })
+        else resolve({ ok: false, message: describeCollectError(resp?.error) })
+      }
+    )
+  })
+}
+
+function collectImages(images: XHSImage[], noteId: string, title: string, author: string): Promise<CollectResult> {
+  return new Promise<CollectResult>((resolve) => {
+    chrome.runtime.sendMessage(
+      {
+        type: "COLLECT_NOTE_IMAGES",
+        payload: {
+          noteId,
+          images: images.map((img, i) => ({
+            url: img.url,
+            width: img.width,
+            height: img.height,
+            groupIndex: i,
+            coverUrl: img.url,
+          })),
+          title: title || "未命名笔记",
+          sourceUrl: location.href,
+          author,
+        },
+      },
+      (resp) => {
+        if (chrome.runtime?.lastError || !isContextValid()) {
+          resolve({ ok: false, message: getRuntimeErrorMessage() })
+          return
+        }
+        if (resp?.success) {
+          const added = typeof resp.added === "number" ? resp.added : images.length
+          const skipped = typeof resp.skipped === "number" ? resp.skipped : 0
+          resolve({
+            ok: true,
+            message: skipped > 0 ? `✅ 新增 ${added} 张,${skipped} 张已存在` : `✅ 已采集 ${added} 张图片`,
+          })
+        } else {
+          resolve({ ok: false, message: describeCollectError(resp?.error) })
+        }
+      }
+    )
+  })
+}
+
+/**
+ * 采集当前可见浮层/详情页的笔记素材(不依赖采集按钮 UI)。
+ * 按钮点击(onCollectClick)和快捷键(COLLECT_CURRENT_NOTE 消息)共用此入口。
+ * 返回 CollectResult,UI 反馈由调用方处理。
+ */
+export async function collectCurrentNote(): Promise<CollectResult> {
+  if (!isContextValid()) {
+    return { ok: false, message: "插件已更新,请刷新页面后重试" }
+  }
+  const noteId = getNoteIdFromUrl()
+  if (!noteId) {
+    return { ok: false, message: "请先点开小红书笔记详情" }
+  }
+  const media = getNoteMediaFromState(noteId)
+  if (!media) {
+    return { ok: false, message: "笔记数据还在加载,请等图片/视频出现后再试" }
+  }
+  // 实时查找当前可见浮层(与采集按钮的 currentContainer 解耦,快捷键路径也能用)
+  const scope = findNoteContainer() || document
+  if (media.type === "video" && media.videoUrl) {
+    return collectVideo(media, noteId, scope)
+  }
+  if (media.images.length > 0) {
+    return collectImages(media.images, noteId, media.title, media.author)
+  }
+  return { ok: false, message: "未找到图片或视频,请确认当前是笔记详情页" }
+}
+
 /**
  * 启动浮层采集器:笔记浮层出现时在主媒体(图片/视频)的左上角显示「采集素材」按钮;
  * 浮层关闭则隐藏。独立详情页(直接打开笔记链接、无浮层容器)在 document 范围找主媒体。
@@ -294,101 +401,13 @@ export function startDetailCollector() {
   function onCollectClick() {
     const b = btn
     if (!b) return
-    if (!isContextValid()) {
-      showToast("❌ 插件已更新,请刷新页面后重试")
-      return
-    }
-    const noteId = getNoteIdFromUrl()
-    if (!noteId) {
-      showToast("❌ 请先点开小红书笔记详情")
-      return
-    }
     b.classList.add("mc_loading")
-    const media = getNoteMediaFromState(noteId)
-    if (!media) {
+    // 采集核心抽到模块级 collectCurrentNote(),与快捷键(COLLECT_CURRENT_NOTE)共用
+    collectCurrentNote().then((result) => {
       b.classList.remove("mc_loading")
-      showToast("❌ 笔记数据还在加载,请等图片/视频出现后再试")
-      return
-    }
-    if (media.type === "video" && media.videoUrl) {
-      collectVideo(media, noteId)
-    } else if (media.images.length > 0) {
-      collectImages(media.images, noteId, media.title, media.author)
-    } else {
-      b.classList.remove("mc_loading")
-      showToast("❌ 未找到图片或视频,请确认当前是笔记详情页")
-    }
-  }
-
-  function collectVideo(media: XHSNoteMedia, noteId: string) {
-    const scope: ParentNode = currentContainer || document
-    const mediaEl = findMediaEl(scope)
-    const domCoverUrl =
-      mediaEl instanceof HTMLVideoElement
-        ? normalizeCoverUrl(mediaEl.poster || "") || findVisibleCoverImage(scope)
-        : mediaEl instanceof HTMLImageElement
-          ? normalizeCoverUrl(mediaEl.currentSrc || mediaEl.src || "")
-          : ""
-
-    chrome.runtime.sendMessage(
-      {
-        type: "COLLECT_MEDIA",
-        payload: {
-          url: media.videoUrl,
-          type: "video",
-          platform: "xiaohongshu",
-          title: media.title,
-          sourceUrl: location.href,
-          noteId,
-          author: media.author,
-          coverUrl: media.coverUrl || domCoverUrl || undefined,
-        },
-      },
-      (resp) => {
-        btn?.classList.remove("mc_loading")
-        if (chrome.runtime?.lastError || !isContextValid()) {
-          showToast(`❌ ${getRuntimeErrorMessage()}`)
-          return
-        }
-        if (resp?.success) markDone("✅ 视频已采集")
-        else showToast(`❌ ${describeCollectError(resp?.error)}`)
-      }
-    )
-  }
-
-  function collectImages(images: XHSImage[], noteId: string, title: string, author: string) {
-    chrome.runtime.sendMessage(
-      {
-        type: "COLLECT_NOTE_IMAGES",
-        payload: {
-          noteId,
-          images: images.map((img, i) => ({
-            url: img.url,
-            width: img.width,
-            height: img.height,
-            groupIndex: i,
-            coverUrl: img.url,
-          })),
-          title: title || "未命名笔记",
-          sourceUrl: location.href,
-          author,
-        },
-      },
-      (resp) => {
-        btn?.classList.remove("mc_loading")
-        if (chrome.runtime?.lastError || !isContextValid()) {
-          showToast(`❌ ${getRuntimeErrorMessage()}`)
-          return
-        }
-        if (resp?.success) {
-          const added = typeof resp.added === "number" ? resp.added : images.length
-          const skipped = typeof resp.skipped === "number" ? resp.skipped : 0
-          markDone(skipped > 0 ? `✅ 新增 ${added} 张,${skipped} 张已存在` : `✅ 已采集 ${added} 张图片`)
-        } else {
-          showToast(`❌ ${describeCollectError(resp?.error)}`)
-        }
-      }
-    )
+      if (result.ok) markDone(result.message)
+      else showToast(`❌ ${result.message}`)
+    })
   }
 
   function markDone(msg: string) {

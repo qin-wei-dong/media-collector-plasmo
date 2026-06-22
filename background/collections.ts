@@ -88,7 +88,7 @@ function migrateCollections(): Promise<void> {
 
 export function ensureCollectionsInitialized(): Promise<void> {
   return enqueueWrite(() =>
-    new Promise((resolve, reject) => {
+    new Promise<void>((resolve, reject) => {
       chrome.storage.local.get(COLLECTIONS_KEY, (result) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message))

@@ -92,13 +92,9 @@ media-collector-plasmo/
 │   ├── collections.ts         ← 收藏夹 CRUD(级联清理 MediaItem.collectionIds)
 │   └── download.ts            ← SW fetch + Referer + data URL 下载(防路径穿越,分文件夹)
 │
-├── components/                ← 素材库 / 共享 React 组件
-│   ├── StatCard.tsx           ← 数据看板卡片(今日 / 总量 / 关注作者)
-│   ├── MediaCard.tsx          ← 单素材封面卡(点击预览,圆圈选中,hover/press 反馈)
-│   ├── FloatBar.tsx           ← 浮动操作栏(全选 / 导出 / 删除;0 选时 dashed 引导)
-│   ├── PreviewModal.tsx       ← 大图预览(同笔记图片左右切换 + 键盘 ← →)
-│   ├── EmptyState.tsx         ← 空状态(三步图示 + 快捷键提示)
-│   └── Toast.tsx              ← 底部 snackbar(删除撤销 / 错误提示共用)
+├── components/                ← 共享 React 组件
+│   └── PreviewModal.tsx       ← 大图预览(同笔记图片左右切换 + 键盘 ← →)
+│   (StatCard / MediaCard / FloatBar / EmptyState / LibraryToast 等已内联进 library.tsx,P1 候选拆分)
 │
 ├── tabs/
 │   └── library.tsx            ← 全屏素材库入口(action 点击直接打开 tabs/library.html)
