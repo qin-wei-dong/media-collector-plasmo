@@ -29,8 +29,17 @@ jobs:
         run: pnpm build
       - name: Package the extension into a zip artifact
         run: pnpm package
+      - name: Check publish keys
+        env:
+          BPP_KEYS: ${{ secrets.BPP_KEYS }}
+          SUBMIT_KEYS: ${{ secrets.SUBMIT_KEYS }}
+        run: |
+          if [ -z "$BPP_KEYS" ] && [ -z "$SUBMIT_KEYS" ]; then
+            echo "::error::Missing GitHub secret. Set BPP_KEYS in repository secrets (SUBMIT_KEYS is accepted as a legacy alias)."
+            exit 1
+          fi
       - name: Browser Platform Publish
         uses: PlasmoHQ/bpp@v3
         with:
-          keys: ${{ secrets.SUBMIT_KEYS }}
+          keys: ${{ secrets.BPP_KEYS || secrets.SUBMIT_KEYS }}
           artifact: build/chrome-mv3-prod.zip

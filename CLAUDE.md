@@ -18,7 +18,7 @@ No linter. vitest for unit tests (pure logic). Prettier is configured (`.prettie
 
 ## Release / publish to Chrome Web Store
 
-Publishing is **manual**, via the `Submit to Web Store` GitHub Action (`.github/workflows/submit.yml`, triggered by `workflow_dispatch` — there is no local publish command). The workflow runs `pnpm build` → `pnpm package` → `PlasmoHQ/bpp` to upload `build/chrome-mv3-prod.zip`. It requires the `SUBMIT_KEYS` secret. Do not attempt to publish any other way.
+Publishing is **manual**, via the `Submit to Web Store` GitHub Action (`.github/workflows/submit.yml`, triggered by `workflow_dispatch` — there is no local publish command). The workflow runs `pnpm build` → `pnpm package` → `PlasmoHQ/bpp` to upload `build/chrome-mv3-prod.zip`. It requires the `BPP_KEYS` secret (`SUBMIT_KEYS` is accepted as a legacy alias). Do not attempt to publish any other way.
 
 ## Architecture (high level)
 

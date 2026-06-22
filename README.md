@@ -140,7 +140,7 @@ media-collector-plasmo/
    ```
 4. **手动验证**(可选但推荐):Chrome `Load unpacked` 选 `build/chrome-mv3-prod/`,跑一遍核心流程(采集 / 打开素材库 / 收藏夹 / 导出 / 导出历史)
 5. **触发 Action**:GitHub 仓库 → Actions → "Submit to Web Store" → Run workflow
-   - 依赖 `SUBMIT_KEYS` secret(Chrome Web Store API key)
+   - 依赖 `BPP_KEYS` secret(Chrome Web Store API key,`SUBMIT_KEYS` 仍兼容)
    - Action 跑 `pnpm build` → `pnpm package` → `PlasmoHQ/bpp` 上传
 
 **注意**:Action 内会重新 build/package,本地产物仅用于本地验证。**绝不要**绕过此 Action 用其他方式发布。
