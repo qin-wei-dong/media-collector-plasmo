@@ -4,6 +4,7 @@
 
 - 操作手册：`$fenix-chrome-publish`
 - 发布复盘：`docs/release/2026-06-23-v2.1.1-publish-retrospective.md`
+- 上线观察：`docs/release/2026-06-23-v2.1.1-post-release-observation.md`
 - GitHub Actions 入口：Actions → `Submit to Web Store` → `Run workflow`
 
 ## Build
