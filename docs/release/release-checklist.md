@@ -1,5 +1,11 @@
 # Release Checklist
 
+## Release References
+
+- 操作手册：`$fenix-chrome-publish`
+- 发布复盘：`docs/release/2026-06-23-v2.1.1-publish-retrospective.md`
+- GitHub Actions 入口：Actions → `Submit to Web Store` → `Run workflow`
+
 ## Build
 
 - [ ] `pnpm build` exits 0.

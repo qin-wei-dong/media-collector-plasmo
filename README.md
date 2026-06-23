@@ -145,6 +145,8 @@ media-collector-plasmo/
 
 **注意**:Action 内会重新 build/package,本地产物仅用于本地验证。**绝不要**绕过此 Action 用其他方式发布。
 
+发布前按 [Release Checklist](./docs/release/release-checklist.md) 逐项核对。v2.1.1 发布过程中遇到的 `BPP_KEYS`、OAuth、Chrome Web Store API 403 等问题已整理到 [v2.1.1 发布复盘](./docs/release/2026-06-23-v2.1.1-publish-retrospective.md),后续发版优先使用本地 skill `$fenix-chrome-publish`。
+
 详细设计见 [DESIGN.md](./DESIGN.md)。
 
 ## 许可证
